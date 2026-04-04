@@ -6,6 +6,8 @@ ui/dist
 !requirements.txt
 !ui/package.json
 !ui/package-lock.json
+!chat_ids.json
+!alerts.json
 __pycache__
 *.pyc
 .claude

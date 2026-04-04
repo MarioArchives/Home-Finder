@@ -5,7 +5,7 @@ import FloorplanModal from '../FloorplanModal/FloorplanModal'
 import type { PropertyCardProps } from './properties'
 import './PropertyCard.css'
 
-function PropertyCard({ listing, nearby, onSelect, valueRating }: PropertyCardProps) {
+function PropertyCard({ listing, nearby, onSelect, valueRating, city }: PropertyCardProps) {
   const [showMap, setShowMap] = useState(false)
   const [showFloorplan, setShowFloorplan] = useState(false)
   const mainImage = listing.images?.[0]
@@ -71,7 +71,7 @@ function PropertyCard({ listing, nearby, onSelect, valueRating }: PropertyCardPr
         </div>
       </div>
       {showMap && (
-        <PropertyDetailMap listing={listing} nearby={nearby} onClose={() => setShowMap(false)} />
+        <PropertyDetailMap listing={listing} nearby={nearby} city={city} onClose={() => setShowMap(false)} />
       )}
       {showFloorplan && listing.floorplan_url && (
         <FloorplanModal

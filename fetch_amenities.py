@@ -16,24 +16,12 @@ Output:
 
 import argparse
 import json
-import math
 import sys
 import time
 import urllib.request
 import urllib.parse
 
-
-def haversine_metres(lat1, lon1, lat2, lon2):
-    """Return distance in metres between two lat/lng points."""
-    R = 6_371_000
-    to_rad = math.radians
-    d_lat = to_rad(lat2 - lat1)
-    d_lon = to_rad(lon2 - lon1)
-    a = (
-        math.sin(d_lat / 2) ** 2
-        + math.cos(to_rad(lat1)) * math.cos(to_rad(lat2)) * math.sin(d_lon / 2) ** 2
-    )
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+from alert_filter import haversine_metres
 
 
 def fetch_overpass(bbox, climbing_bbox):

@@ -14,6 +14,10 @@ AMENITIES_FILE="$DATA_DIR/${SLUG}_${LISTING_TYPE}_amenities.json"
 
 mkdir -p "$DATA_DIR"
 
+# Seed alerts and chat subscriptions into data volume if not already present
+[ ! -f "$DATA_DIR/alerts.json" ] && [ -f /app/alerts.json ] && cp /app/alerts.json "$DATA_DIR/alerts.json"
+[ ! -f "$DATA_DIR/chat_ids.json" ] && [ -f /app/chat_ids.json ] && cp /app/chat_ids.json "$DATA_DIR/chat_ids.json"
+
 # -------------------------------------------------------------------------
 # Initial scrape if no data exists
 # -------------------------------------------------------------------------
@@ -50,20 +54,22 @@ CRON_LOG="/app/data/cron.log"
 RAND_HOUR=$(( RANDOM % 17 + 6 ))
 RAND_MIN=$(( RANDOM % 60 ))
 
+# Write all relevant env vars to a file that cron jobs will source
+ENV_FILE="/app/data/.env.cron"
+printenv | grep -E '^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_)' > "$ENV_FILE"
+
 cat > /etc/cron.d/property-update << EOF
 # Re-scrape listings daily at 6am
-0 6 * * * cd /app && python3 /app/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "$LISTINGS_FILE" >> "$CRON_LOG" 2>&1
+0 6 * * * cd /app && . $ENV_FILE && python3 /app/scrape_listings.py --city "\$CITY" --type "\$LISTING_TYPE" --pages "\$PAGES" --source "\$SOURCE" --output "$LISTINGS_FILE" >> "$CRON_LOG" 2>&1
 
 # Check alerts for new listings at a random daily time ($RAND_HOUR:$(printf '%02d' $RAND_MIN))
-$RAND_MIN $RAND_HOUR * * * cd /app && DATA_DIR="$DATA_DIR" CITY="$CITY" LISTING_TYPE="$LISTING_TYPE" SOURCE="$SOURCE" PAGES="$PAGES" python3 /app/check_new_listings.py >> "$CRON_LOG" 2>&1
+$RAND_MIN $RAND_HOUR * * * cd /app && . $ENV_FILE && python3 /app/check_new_listings.py >> "$CRON_LOG" 2>&1
 
 # Refresh amenities weekly on Sunday at 7am
-0 7 * * 0 cd /app && python3 /app/fetch_amenities.py "$LISTINGS_FILE" "$AMENITIES_FILE" >> "$CRON_LOG" 2>&1
+0 7 * * 0 cd /app && . $ENV_FILE && python3 /app/fetch_amenities.py "$LISTINGS_FILE" "$AMENITIES_FILE" >> "$CRON_LOG" 2>&1
 
 EOF
 
-# Pass environment variables to cron
-printenv | grep -E '^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_)' > /etc/environment
 chmod 0644 /etc/cron.d/property-update
 crontab /etc/cron.d/property-update
 

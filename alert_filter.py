@@ -79,9 +79,12 @@ def matches_alert(listing: dict, alert: dict) -> bool:
 
     # Bedrooms
     min_beds = alert.get("minBedrooms")
-    if min_beds is not None:
+    max_beds = alert.get("maxBedrooms")
+    if min_beds is not None or max_beds is not None:
         beds = listing.get("bedrooms")
-        if beds is not None and beds < min_beds:
+        if min_beds is not None and (beds is not None and beds < min_beds):
+            return False
+        if max_beds is not None and (beds is not None and beds > max_beds):
             return False
 
     # Bathrooms
@@ -114,11 +117,15 @@ def matches_alert(listing: dict, alert: dict) -> bool:
         if ptype and ptype not in allowed_types:
             return False
 
-    # Furnishing
-    furnish = alert.get("furnishType")
-    if furnish:
+    # Furnishing (supports both old furnishType string and new furnishTypes array)
+    furnish_types = alert.get("furnishTypes") or []
+    if not furnish_types:
+        old_furnish = alert.get("furnishType")
+        if old_furnish:
+            furnish_types = [old_furnish]
+    if furnish_types:
         listing_furnish = listing.get("furnish_type") or ""
-        if listing_furnish and listing_furnish != furnish:
+        if listing_furnish and listing_furnish not in furnish_types:
             return False
 
     # Square footage

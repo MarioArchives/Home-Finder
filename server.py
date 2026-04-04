@@ -18,6 +18,7 @@ import urllib.request
 import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from format_notify import load_amenities, format_listing, format_alert_summary
 
 
 def _load_dotenv():
@@ -37,22 +38,50 @@ def _load_dotenv():
 _load_dotenv()
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+CITY = os.environ.get("CITY", "Manchester")
+LISTING_TYPE = os.environ.get("LISTING_TYPE", "rent")
 ALERTS_FILE = DATA_DIR / "alerts.json"
+CHATS_FILE = DATA_DIR / "chat_ids.json"
+_slug = CITY.lower().replace(" ", "_")
 LISTINGS_FILE = Path(os.environ.get(
     "LISTINGS_FILE",
-    Path(__file__).parent / "manchester_rent_listings.json",
+    DATA_DIR / f"{_slug}_{LISTING_TYPE}_listings.json",
 ))
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 
-def send_telegram(text: str):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+def load_chats() -> list[dict]:
+    if CHATS_FILE.exists():
+        try:
+            return json.loads(CHATS_FILE.read_text())
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
+    chats = load_chats()
+    if not chats:
+        return [TELEGRAM_CHAT_ID] if TELEGRAM_CHAT_ID else []
+    result = []
+    for chat in chats:
+        subscribed = chat.get("alert_ids")
+        if subscribed is None or (alert_id and alert_id in subscribed):
+            result.append(chat["chat_id"])
+    return result
+
+
+def send_telegram(text: str, chat_id: str | None = None):
+    if not TELEGRAM_BOT_TOKEN:
         print(f"[Telegram] Not configured. Message:\n{text}")
+        return
+    if not chat_id:
+        print("[Telegram] No chat ID provided, skipping.")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": "true",
@@ -61,7 +90,7 @@ def send_telegram(text: str):
         req = urllib.request.Request(url, data=data)
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
-        print(f"[Telegram] Failed to send: {e}")
+        print(f"[Telegram] Failed to send to {chat_id}: {e}")
 
 
 def _matches_alert(listing: dict, alert: dict) -> bool:
@@ -83,11 +112,68 @@ def save_alerts(alerts: list[dict]):
     ALERTS_FILE.write_text(json.dumps(alerts, indent=2))
 
 
+def save_chats(chats: list[dict]):
+    CHATS_FILE.write_text(json.dumps(chats, indent=2))
+
+
+def sync_chat_subscriptions(alert_id: str, chat_ids: list[str] | None):
+    """Update chat_ids.json so each chat's alert_ids reflects this alert's chatIds."""
+    chats = load_chats()
+    for chat in chats:
+        cid = chat["chat_id"]
+        subscribed = chat.get("alert_ids")
+        if chat_ids is None:
+            # All chats — ensure alert_ids is None (subscribed to all) or contains this alert
+            # Don't change chats that are already subscribed to all
+            continue
+        if cid in chat_ids:
+            if subscribed is not None and alert_id not in subscribed:
+                subscribed.append(alert_id)
+                chat["alert_ids"] = subscribed
+        else:
+            if subscribed is None:
+                # Chat was subscribed to all — now needs an explicit list excluding this alert
+                all_alert_ids = [a["id"] for a in load_alerts() if a["id"] != alert_id]
+                chat["alert_ids"] = all_alert_ids
+            elif alert_id in subscribed:
+                subscribed.remove(alert_id)
+                chat["alert_ids"] = subscribed
+    save_chats(chats)
+
+
+def remove_alert_from_chats(alert_id: str):
+    """Remove an alert ID from all chat subscriptions."""
+    chats = load_chats()
+    changed = False
+    for chat in chats:
+        subscribed = chat.get("alert_ids")
+        if subscribed is not None and alert_id in subscribed:
+            subscribed.remove(alert_id)
+            if not subscribed:
+                chat["alert_ids"] = None
+            changed = True
+    if changed:
+        save_chats(chats)
+
+
 class AppHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/alerts":
             alerts = load_alerts()
+            # Enrich alerts with their chatIds based on chat_ids.json
+            chats = load_chats()
+            for alert in alerts:
+                aid = alert["id"]
+                subscribed_chats = []
+                for chat in chats:
+                    subs = chat.get("alert_ids")
+                    if subs is None or aid in subs:
+                        subscribed_chats.append(chat["chat_id"])
+                alert["chatIds"] = subscribed_chats if subscribed_chats != [c["chat_id"] for c in chats] else None
             self._json_response(200, alerts)
+        elif self.path == "/api/chats":
+            chats = load_chats()
+            self._json_response(200, chats)
         else:
             super().do_GET()
 
@@ -116,18 +202,27 @@ class AppHandler(SimpleHTTPRequestHandler):
             matches = [l for l in listings if _matches_alert(l, alert)]
             urls = [l.get("url", "") for l in matches if l.get("url")]
 
+            # Load amenities for enriched messages
+            amenities = load_amenities(DATA_DIR, CITY, LISTING_TYPE)
+
             # Send to Telegram
-            if urls:
-                lines = [f'🧪 <b>Test: {len(urls)} match(es) for "{alert["name"]}"</b>', ""]
-                for url in urls:
-                    lines.append(url)
-                # Telegram has a 4096 char limit per message, split if needed
-                msg = "\n".join(lines)
-                while msg:
-                    chunk, msg = msg[:4096], msg[4096:]
-                    send_telegram(chunk)
+            total = len(listings)
+            targets = get_chat_ids_for_alert(alert_id)
+            if matches:
+                pct = (len(matches) / total * 100) if total else 0
+                header = f"🧪 <b>Test</b>\n\n{format_alert_summary(alert)}"
+                header += f"\n\n🏠 <b>{len(matches)} of {total} listings matched ({pct:.1f}%)</b>"
+                for cid in targets:
+                    send_telegram(header, chat_id=cid)
+                for listing in matches:
+                    msg = format_listing(listing, alert=alert, amenities=amenities)
+                    for cid in targets:
+                        send_telegram(msg, chat_id=cid)
             else:
-                send_telegram(f'🧪 <b>Test: no listings match "{alert["name"]}"</b>')
+                for cid in targets:
+                    send_telegram(
+                        f'🧪 <b>Test: 0 of {total} listings match "{alert["name"]}"</b>',
+                        chat_id=cid)
 
             self._json_response(200, {"matches": len(urls), "urls": urls})
             return
@@ -146,11 +241,12 @@ class AppHandler(SimpleHTTPRequestHandler):
                 "minPrice": body.get("minPrice"),
                 "maxPrice": body.get("maxPrice"),
                 "minBedrooms": body.get("minBedrooms"),
+                "maxBedrooms": body.get("maxBedrooms"),
                 "minBathrooms": body.get("minBathrooms"),
                 "source": body.get("source"),
                 "councilTaxBands": body.get("councilTaxBands"),
                 "propertyTypes": body.get("propertyTypes"),
-                "furnishType": body.get("furnishType"),
+                "furnishTypes": body.get("furnishTypes"),
                 "minSqFt": body.get("minSqFt"),
                 "maxSqFt": body.get("maxSqFt"),
                 "availableFrom": body.get("availableFrom"),
@@ -162,10 +258,65 @@ class AppHandler(SimpleHTTPRequestHandler):
                 "search": body.get("search", ""),
                 "createdAt": body.get("createdAt"),
             }
+            chat_ids = body.get("chatIds")
             alerts = load_alerts()
             alerts.append(alert)
             save_alerts(alerts)
+            if chat_ids is not None:
+                sync_chat_subscriptions(alert["id"], chat_ids)
+            alert["chatIds"] = chat_ids
             self._json_response(201, alert)
+        else:
+            self._json_response(404, {"error": "Not found"})
+
+    def do_PUT(self):
+        put_match = re.match(r"^/api/alerts/([^/]+)$", self.path)
+        if put_match:
+            alert_id = put_match.group(1)
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length))
+            except (json.JSONDecodeError, ValueError):
+                self._json_response(400, {"error": "Invalid JSON"})
+                return
+
+            alerts = load_alerts()
+            idx = next((i for i, a in enumerate(alerts) if a["id"] == alert_id), None)
+            if idx is None:
+                self._json_response(404, {"error": "Alert not found"})
+                return
+
+            existing = alerts[idx]
+            updated = {
+                "id": alert_id,
+                "name": body.get("name", existing["name"]),
+                "minPrice": body.get("minPrice"),
+                "maxPrice": body.get("maxPrice"),
+                "minBedrooms": body.get("minBedrooms"),
+                "maxBedrooms": body.get("maxBedrooms"),
+                "minBathrooms": body.get("minBathrooms"),
+                "source": body.get("source"),
+                "councilTaxBands": body.get("councilTaxBands"),
+                "propertyTypes": body.get("propertyTypes"),
+                "furnishTypes": body.get("furnishTypes"),
+                "minSqFt": body.get("minSqFt"),
+                "maxSqFt": body.get("maxSqFt"),
+                "availableFrom": body.get("availableFrom"),
+                "availableTo": body.get("availableTo"),
+                "pinLat": body.get("pinLat"),
+                "pinLng": body.get("pinLng"),
+                "pinRadius": body.get("pinRadius"),
+                "excludeShares": body.get("excludeShares", False),
+                "search": body.get("search", ""),
+                "createdAt": existing.get("createdAt"),
+            }
+            alerts[idx] = updated
+            save_alerts(alerts)
+
+            chat_ids = body.get("chatIds")
+            sync_chat_subscriptions(alert_id, chat_ids)
+            updated["chatIds"] = chat_ids
+            self._json_response(200, updated)
         else:
             self._json_response(404, {"error": "Not found"})
 
@@ -178,6 +329,7 @@ class AppHandler(SimpleHTTPRequestHandler):
                 self._json_response(404, {"error": "Alert not found"})
                 return
             save_alerts(new_alerts)
+            remove_alert_from_chats(alert_id)
             self._json_response(200, {"ok": True})
         else:
             self._json_response(404, {"error": "Not found"})

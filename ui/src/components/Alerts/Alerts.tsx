@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet'
-import type { Alert } from '../../types/listing'
+import type { Alert, Chat } from '../../types/listing'
 import '../../shared/mapIcons/mapIcons'
 import './Alerts.css'
 
@@ -78,8 +78,10 @@ const COUNCIL_TAX_BANDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bathroomCounts, sources }: AlertsProps) {
     const [alerts, setAlerts] = useState<Alert[]>([])
+    const [chats, setChats] = useState<Chat[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
     const [testing, setTesting] = useState<string | null>(null)
     const [testResult, setTestResult] = useState<{ id: string; matches: number; urls: string[] } | null>(null)
 
@@ -88,11 +90,13 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
     const [minPrice, setMinPrice] = useState('')
     const [maxPrice, setMaxPrice] = useState('')
     const [minBedrooms, setMinBedrooms] = useState('')
+    const [maxBedrooms, setMaxBedrooms] = useState('')
     const [minBathrooms, setMinBathrooms] = useState('')
     const [source, setSource] = useState('')
     const [selectedTaxBands, setSelectedTaxBands] = useState<string[]>([])
     const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>([])
-    const [furnishType, setFurnishType] = useState('')
+    const [selectedFurnishTypes, setSelectedFurnishTypes] = useState<string[]>([])
+    const [selectedChatIds, setSelectedChatIds] = useState<string[]>([])
     const [minSqFt, setMinSqFt] = useState('')
     const [maxSqFt, setMaxSqFt] = useState('')
     const [availableFrom, setAvailableFrom] = useState('')
@@ -106,9 +110,14 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
-        fetch('/api/alerts')
-            .then(r => r.json())
-            .then(setAlerts)
+        Promise.all([
+            fetch('/api/alerts').then(r => r.json()),
+            fetch('/api/chats').then(r => r.json()),
+        ])
+            .then(([alertsData, chatsData]) => {
+                setAlerts(alertsData)
+                setChats(chatsData)
+            })
             .catch(() => {})
             .finally(() => setLoading(false))
     }, [])
@@ -118,11 +127,13 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
         setMinPrice('')
         setMaxPrice('')
         setMinBedrooms('')
+        setMaxBedrooms('')
         setMinBathrooms('')
         setSource('')
         setSelectedTaxBands([])
         setSelectedPropertyTypes([])
-        setFurnishType('')
+        setSelectedFurnishTypes([])
+        setSelectedChatIds([])
         setMinSqFt('')
         setMaxSqFt('')
         setAvailableFrom('')
@@ -135,38 +146,90 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
         setSearch('')
     }
 
-    const handleCreate = async () => {
+    const loadAlertIntoForm = (a: Alert) => {
+        setName(a.name)
+        setMinPrice(a.minPrice != null ? String(a.minPrice) : '')
+        setMaxPrice(a.maxPrice != null ? String(a.maxPrice) : '')
+        setMinBedrooms(a.minBedrooms != null ? String(a.minBedrooms) : '')
+        setMaxBedrooms(a.maxBedrooms != null ? String(a.maxBedrooms) : '')
+        setMinBathrooms(a.minBathrooms != null ? String(a.minBathrooms) : '')
+        setSource(a.source || '')
+        setSelectedTaxBands(a.councilTaxBands || [])
+        setSelectedPropertyTypes(a.propertyTypes || [])
+        setSelectedFurnishTypes(a.furnishTypes || [])
+        setSelectedChatIds(a.chatIds || [])
+        setMinSqFt(a.minSqFt != null ? String(a.minSqFt) : '')
+        setMaxSqFt(a.maxSqFt != null ? String(a.maxSqFt) : '')
+        setAvailableFrom(a.availableFrom || '')
+        setAvailableTo(a.availableTo || '')
+        setPinLat(a.pinLat != null ? String(a.pinLat) : '')
+        setPinLng(a.pinLng != null ? String(a.pinLng) : '')
+        setPinRadius(a.pinRadius != null ? String(a.pinRadius) : '')
+        setExcludeShares(a.excludeShares)
+        setSearch(a.search || '')
+    }
+
+    const handleEdit = (a: Alert) => {
+        loadAlertIntoForm(a)
+        setEditingId(a.id)
+        setShowForm(true)
+    }
+
+    const handleCancel = () => {
+        resetForm()
+        setEditingId(null)
+        setShowForm(false)
+    }
+
+    const buildAlertPayload = () => ({
+        name: name.trim(),
+        minPrice: minPrice ? Number(minPrice) : null,
+        maxPrice: maxPrice ? Number(maxPrice) : null,
+        minBedrooms: minBedrooms ? Number(minBedrooms) : null,
+        maxBedrooms: maxBedrooms ? Number(maxBedrooms) : null,
+        minBathrooms: minBathrooms ? Number(minBathrooms) : null,
+        source: source || null,
+        councilTaxBands: selectedTaxBands.length > 0 ? selectedTaxBands : null,
+        propertyTypes: selectedPropertyTypes.length > 0 ? selectedPropertyTypes : null,
+        furnishTypes: selectedFurnishTypes.length > 0 ? selectedFurnishTypes : null,
+        chatIds: selectedChatIds.length > 0 ? selectedChatIds : null,
+        minSqFt: minSqFt ? Number(minSqFt) : null,
+        maxSqFt: maxSqFt ? Number(maxSqFt) : null,
+        availableFrom: availableFrom || null,
+        availableTo: availableTo || null,
+        pinLat: pinLat ? Number(pinLat) : null,
+        pinLng: pinLng ? Number(pinLng) : null,
+        pinRadius: pinRadius ? Number(pinRadius) : null,
+        excludeShares,
+        search: search.trim(),
+    })
+
+    const handleSave = async () => {
         if (!name.trim()) return
         setSaving(true)
         try {
-            const res = await fetch('/api/alerts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    minPrice: minPrice ? Number(minPrice) : null,
-                    maxPrice: maxPrice ? Number(maxPrice) : null,
-                    minBedrooms: minBedrooms ? Number(minBedrooms) : null,
-                    minBathrooms: minBathrooms ? Number(minBathrooms) : null,
-                    source: source || null,
-                    councilTaxBands: selectedTaxBands.length > 0 ? selectedTaxBands : null,
-                    propertyTypes: selectedPropertyTypes.length > 0 ? selectedPropertyTypes : null,
-                    furnishType: furnishType || null,
-                    minSqFt: minSqFt ? Number(minSqFt) : null,
-                    maxSqFt: maxSqFt ? Number(maxSqFt) : null,
-                    availableFrom: availableFrom || null,
-                    availableTo: availableTo || null,
-                    pinLat: pinLat ? Number(pinLat) : null,
-                    pinLng: pinLng ? Number(pinLng) : null,
-                    pinRadius: pinRadius ? Number(pinRadius) : null,
-                    excludeShares,
-                    search: search.trim(),
-                    createdAt: new Date().toISOString(),
-                }),
-            })
-            const created = await res.json()
-            setAlerts(prev => [...prev, created])
+            if (editingId) {
+                const res = await fetch(`/api/alerts/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(buildAlertPayload()),
+                })
+                const updated = await res.json()
+                setAlerts(prev => prev.map(a => a.id === editingId ? updated : a))
+            } else {
+                const res = await fetch('/api/alerts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...buildAlertPayload(),
+                        createdAt: new Date().toISOString(),
+                    }),
+                })
+                const created = await res.json()
+                setAlerts(prev => [...prev, created])
+            }
             resetForm()
+            setEditingId(null)
             setShowForm(false)
         } catch {
             alert('Failed to save alert')
@@ -210,6 +273,18 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
         )
     }
 
+    const toggleFurnishType = (type: string) => {
+        setSelectedFurnishTypes(prev =>
+            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+        )
+    }
+
+    const toggleChatId = (id: string) => {
+        setSelectedChatIds(prev =>
+            prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+        )
+    }
+
     if (loading) {
         return <div className="alerts-loading">Loading alerts...</div>
     }
@@ -223,7 +298,9 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                         Set up alerts with your criteria. The app checks daily at a random time for new listings matching your parameters and sends notifications via Telegram.
                     </p>
                 </div>
-                <button className="btn-new-alert" onClick={() => setShowForm(!showForm)}>
+                <button className="btn-new-alert" onClick={() => {
+                    if (showForm) { handleCancel() } else { setShowForm(true) }
+                }}>
                     {showForm ? 'Cancel' : '+ New Alert'}
                 </button>
             </div>
@@ -266,6 +343,13 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                             </select>
                         </div>
                         <div className="form-group">
+                            <label>Max bedrooms</label>
+                            <select value={maxBedrooms} onChange={e => setMaxBedrooms(e.target.value)}>
+                                <option value="">Any</option>
+                                {bedroomCounts.map(n => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
                             <label>Min bathrooms</label>
                             <select value={minBathrooms} onChange={e => setMinBathrooms(e.target.value)}>
                                 <option value="">Any</option>
@@ -279,12 +363,19 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 {sources.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        <div className="form-group">
+                        <div className="form-group form-group-wide">
                             <label>Furnishing</label>
-                            <select value={furnishType} onChange={e => setFurnishType(e.target.value)}>
-                                <option value="">Any</option>
-                                {furnishTypes.map(f => <option key={f} value={f}>{f}</option>)}
-                            </select>
+                            <div className="band-toggles">
+                                {furnishTypes.map(f => (
+                                    <button
+                                        key={f}
+                                        className={`band-toggle ${selectedFurnishTypes.includes(f) ? 'active' : ''}`}
+                                        onClick={() => toggleFurnishType(f)}
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                         <div className="form-group">
                             <label>Min sq ft</label>
@@ -392,10 +483,29 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 Exclude shares
                             </label>
                         </div>
+                        {chats.length > 0 && (
+                            <div className="form-group form-group-wide">
+                                <label>Send to chats</label>
+                                <div className="band-toggles">
+                                    {chats.map(c => (
+                                        <button
+                                            key={c.chat_id}
+                                            className={`band-toggle ${selectedChatIds.length === 0 || selectedChatIds.includes(c.chat_id) ? 'active' : ''}`}
+                                            onClick={() => toggleChatId(c.chat_id)}
+                                        >
+                                            {c.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="form-hint">
+                                    {selectedChatIds.length === 0 ? 'All chats selected' : `${selectedChatIds.length} of ${chats.length} selected`}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="alert-form-actions">
-                        <button className="btn-save-alert" onClick={handleCreate} disabled={!name.trim() || saving}>
-                            {saving ? 'Saving...' : 'Save Alert'}
+                        <button className="btn-save-alert" onClick={handleSave} disabled={!name.trim() || saving}>
+                            {saving ? 'Saving...' : editingId ? 'Update Alert' : 'Save Alert'}
                         </button>
                     </div>
 
@@ -442,8 +552,14 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 {a.maxPrice != null && (
                                     <span className="alert-tag">Max £{a.maxPrice} pcm</span>
                                 )}
-                                {a.minBedrooms != null && (
-                                    <span className="alert-tag">{a.minBedrooms}+ beds</span>
+                                {(a.minBedrooms != null || a.maxBedrooms != null) && (
+                                    <span className="alert-tag">
+                                        {a.minBedrooms != null && a.maxBedrooms != null
+                                            ? `${a.minBedrooms}–${a.maxBedrooms} beds`
+                                            : a.minBedrooms != null
+                                                ? `${a.minBedrooms}+ beds`
+                                                : `Up to ${a.maxBedrooms} beds`}
+                                    </span>
                                 )}
                                 {a.minBathrooms != null && (
                                     <span className="alert-tag">{a.minBathrooms}+ baths</span>
@@ -457,8 +573,8 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 {a.propertyTypes && a.propertyTypes.length > 0 && (
                                     <span className="alert-tag">{a.propertyTypes.join(', ')}</span>
                                 )}
-                                {a.furnishType && (
-                                    <span className="alert-tag">{a.furnishType}</span>
+                                {a.furnishTypes && a.furnishTypes.length > 0 && (
+                                    <span className="alert-tag">{a.furnishTypes.join(', ')}</span>
                                 )}
                                 {a.minSqFt != null && (
                                     <span className="alert-tag">Min {a.minSqFt} sq ft</span>
@@ -481,16 +597,26 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 {a.search && (
                                     <span className="alert-tag">"{a.search}"</span>
                                 )}
+                                {a.chatIds && a.chatIds.length > 0 && (
+                                    <span className="alert-tag">
+                                        Chats: {a.chatIds.map(cid => chats.find(c => c.chat_id === cid)?.name || cid).join(', ')}
+                                    </span>
+                                )}
                             </div>
                             <div className="alert-card-footer">
                                 <span>Created {new Date(a.createdAt).toLocaleDateString()}</span>
-                                <button
-                                    className="btn-test-alert"
-                                    onClick={() => handleTest(a.id)}
-                                    disabled={testing === a.id}
-                                >
-                                    {testing === a.id ? 'Sending...' : 'Test on Telegram'}
-                                </button>
+                                <div className="alert-card-actions">
+                                    <button className="btn-edit-alert" onClick={() => handleEdit(a)}>
+                                        Edit
+                                    </button>
+                                    <button
+                                        className="btn-test-alert"
+                                        onClick={() => handleTest(a.id)}
+                                        disabled={testing === a.id}
+                                    >
+                                        {testing === a.id ? 'Sending...' : 'Test on Telegram'}
+                                    </button>
+                                </div>
                             </div>
                             {testResult?.id === a.id && (
                                 <div className="alert-test-result">

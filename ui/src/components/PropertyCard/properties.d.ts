@@ -5,4 +5,5 @@ export interface PropertyCardProps {
   nearby?: NearbyData
   onSelect?: (listing: Listing) => void
   valueRating?: string
+  city?: string
 }

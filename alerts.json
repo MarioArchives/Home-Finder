@@ -5,6 +5,7 @@
     "minPrice": null,
     "maxPrice": 1450,
     "minBedrooms": 2,
+    "maxBedrooms": 3,
     "minBathrooms": null,
     "source": null,
     "councilTaxBands": [
@@ -14,11 +15,11 @@
       "D"
     ],
     "propertyTypes": null,
-    "furnishType": "Furnished",
+    "furnishTypes": null,
     "minSqFt": null,
     "maxSqFt": null,
-    "availableFrom": null,
-    "availableTo": "2026-06-15",
+    "availableFrom": "2026-05-31",
+    "availableTo": null,
     "pinLat": 53.47667896327277,
     "pinLng": -2.2286781836378555,
     "pinRadius": 1,

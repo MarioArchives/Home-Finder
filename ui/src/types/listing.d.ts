@@ -62,6 +62,7 @@ export interface FilterState {
   minPrice: string
   maxPrice: string
   bedrooms: string
+  maxBedrooms: string
   bathrooms: string
   propertyType: string
   propertyTypes: string[]
@@ -86,11 +87,12 @@ export interface Alert {
   minPrice: number | null
   maxPrice: number | null
   minBedrooms: number | null
+  maxBedrooms: number | null
   minBathrooms: number | null
   source: string | null
   councilTaxBands: string[] | null
   propertyTypes: string[] | null
-  furnishType: string | null
+  furnishTypes: string[] | null
   minSqFt: number | null
   maxSqFt: number | null
   availableFrom: string | null
@@ -100,6 +102,13 @@ export interface Alert {
   pinRadius: number | null
   excludeShares: boolean
   search: string
+  chatIds: string[] | null
   createdAt: string
+}
+
+export interface Chat {
+  chat_id: string
+  name: string
+  alert_ids: string[] | null
 }
 

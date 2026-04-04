@@ -18,6 +18,7 @@ const INITIAL_FILTERS: FilterState = {
     minPrice: '',
     maxPrice: '',
     bedrooms: '',
+    maxBedrooms: '',
     bathrooms: '',
     propertyType: '',
     propertyTypes: [],
@@ -277,6 +278,7 @@ export default function App() {
             if (filters.minPrice && price != null && price < Number(filters.minPrice)) return false
             if (filters.maxPrice && price != null && price > Number(filters.maxPrice)) return false
             if (filters.bedrooms && (l.bedrooms == null || l.bedrooms < Number(filters.bedrooms))) return false
+            if (filters.maxBedrooms && (l.bedrooms == null || l.bedrooms > Number(filters.maxBedrooms))) return false
             if (filters.bathrooms && (l.bathrooms == null || l.bathrooms < Number(filters.bathrooms))) return false
             if (filters.propertyType && l.property_type !== filters.propertyType) return false
             if (filters.propertyTypes.length > 0 && !filters.propertyTypes.includes(l.property_type)) return false
@@ -450,6 +452,13 @@ export default function App() {
                             <select value={filters.bedrooms} onChange={(e) => updateFilter('bedrooms', e.target.value)}>
                                 <option value="">Any</option>
                                 {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}+</option>)}
+                            </select>
+                        </div>
+                        <div className="filter-group">
+                            <label>Max beds</label>
+                            <select value={filters.maxBedrooms} onChange={(e) => updateFilter('maxBedrooms', e.target.value)}>
+                                <option value="">Any</option>
+                                {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}</option>)}
                             </select>
                         </div>
                         <div className="filter-group">
@@ -664,6 +673,7 @@ export default function App() {
                                             nearby={nearbyStatus === 'done' ? nearbyCounts[listing.url] : undefined}
                                             onSelect={setSelectedListing}
                                             valueRating={valueRatings[listing.url]}
+                                            city={data?.city}
                                         />
                                     ))}
                                 </div>

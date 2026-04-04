@@ -4,7 +4,7 @@ import { formatDistance } from '../../shared/utils/utils'
 import type { PropertyDetailMapProps } from './properties'
 import './PropertyDetailMap.css'
 
-export default function PropertyDetailMap({ listing, nearby, onClose }: PropertyDetailMapProps) {
+export default function PropertyDetailMap({ listing, nearby, city, onClose }: PropertyDetailMapProps) {
   const places = nearby?.places || []
   const center: [number, number] = [listing.latitude!, listing.longitude!]
 
@@ -45,7 +45,7 @@ export default function PropertyDetailMap({ listing, nearby, onClose }: Property
                 click: () => {
                   const query = place.name || place.category
                   window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(query + ' Manchester')}`,
+                    `https://www.google.com/search?q=${encodeURIComponent(query + (city ? ' ' + city : ''))}`,
                     '_blank'
                   )
                 },

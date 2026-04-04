@@ -30,7 +30,10 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install chromium
 
 # Copy Python scripts
-COPY scrape_listings.py check_new_listings.py fetch_amenities.py backfill_amenities.py server.py ./
+COPY scrape_listings.py check_new_listings.py fetch_amenities.py server.py format_notify.py alert_filter.py update_chats.py ./
+
+# Copy seed data (alerts & chat subscriptions)
+COPY alerts.json chat_ids.json ./
 
 # Copy built UI
 COPY --from=ui-build /app/ui/dist /app/ui/dist
