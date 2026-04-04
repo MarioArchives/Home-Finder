@@ -1,0 +1,31 @@
+.emoji-marker-icon {
+  font-size: 26px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7));
+}
+
+.emoji-marker-icon--property {
+  font-size: 36px;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.7));
+}
+
+.dot-marker-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.dot-marker-icon--bars { background: #f59e0b; }
+.dot-marker-icon--cafes { background: #8b5cf6; }
+.dot-marker-icon--shops { background: #10b981; }
+.dot-marker-icon--default { background: #6b7280; }
+
+.dot-marker-icon--property {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}

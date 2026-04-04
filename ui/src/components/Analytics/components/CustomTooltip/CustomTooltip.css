@@ -1,0 +1,18 @@
+.analytics-tooltip {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.analytics-tooltip-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.analytics-tooltip-secondary {
+  color: #8b8fa3;
+  font-size: 11px;
+}

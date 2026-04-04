@@ -1,0 +1,116 @@
+.btn-detail-map {
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-light);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+
+.btn-detail-map:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.detail-map-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.detail-map-modal {
+  background: #1a1a2e;
+  border-radius: 16px;
+  overflow: hidden;
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.detail-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.detail-map-header strong {
+  font-size: 18px;
+  color: #f1f5f9;
+}
+
+.detail-map-address {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.detail-map-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.detail-map-close:hover {
+  color: #f1f5f9;
+}
+
+.detail-map-legend {
+  display: flex;
+  gap: 16px;
+  padding: 10px 20px;
+  font-size: 13px;
+  color: #cbd5e1;
+  border-bottom: 1px solid #2a2a4a;
+  flex-wrap: wrap;
+}
+
+.detail-leaflet-map {
+  height: 500px;
+  width: 100%;
+  z-index: 1;
+}
+
+.detail-leaflet-map .leaflet-tile-pane {
+  filter: brightness(1.4) contrast(1.1);
+}
+
+.leaflet-tooltip.amenity-tooltip.amenity-tooltip {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.leaflet-tooltip.amenity-tooltip.amenity-tooltip .leaflet-tooltip-tip {
+  border-top-color: #1e293b;
+}
+
+.leaflet-marker-icon.emoji-marker.emoji-marker {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

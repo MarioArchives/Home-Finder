@@ -1,0 +1,78 @@
+.map-container {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.leaflet-map {
+  height: 600px;
+  width: 100%;
+  z-index: 1;
+}
+
+.map-popup {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  min-width: 200px;
+}
+
+.popup-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.popup-price {
+  font-size: 16px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.popup-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.popup-address {
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.popup-details {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #6b7280;
+}
+
+.popup-nearby {
+  font-size: 13px;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  color: #374151;
+}
+
+.popup-nearby-label {
+  color: #9ca3af;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.popup-links {
+  display: flex;
+  gap: 10px;
+}
+
+.popup-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.popup-link:hover {
+  text-decoration: underline;
+}

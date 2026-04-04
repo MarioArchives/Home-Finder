@@ -1,0 +1,53 @@
+.price-heatmap-container {
+  height: 500px;
+  width: 100%;
+  z-index: 1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.price-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.price-heatmap-gradient {
+  height: 12px;
+  flex: 1;
+  max-width: 200px;
+  border-radius: 6px;
+}
+
+.heatmap-no-data {
+  color: var(--text-light);
+  font-size: 13px;
+  text-align: center;
+  padding: 40px 20px;
+  margin: 0;
+}
+
+.heatmap-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.heatmap-slider-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+.heatmap-slider {
+  width: 160px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}

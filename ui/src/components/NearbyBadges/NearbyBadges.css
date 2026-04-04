@@ -1,0 +1,28 @@
+.nearby-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.nearby-row.loading {
+  font-size: 12px;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+.nearby-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.nearby-icon {
+  font-size: 14px;
+}
