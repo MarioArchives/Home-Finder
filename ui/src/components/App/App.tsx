@@ -7,11 +7,14 @@ import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-lea
 import PropertyCard from '../PropertyCard/PropertyCard'
 import MapView from '../MapView/MapView'
 import PropertyPopup from '../Analytics/components/PropertyPopup/PropertyPopup'
+import SetupWizard from '../SetupWizard/SetupWizard'
+import SetupProgress from '../SetupProgress/SetupProgress'
 import '../../shared/mapIcons/mapIcons'
 import type { Listing, ListingsData, NearbyData, FilterState, DrillDownFilter } from '../../types/listing'
 
 const Analytics = lazy(() => import('../Analytics/Analytics'))
 const Alerts = lazy(() => import('../Alerts/Alerts'))
+const TelegramSetup = lazy(() => import('../TelegramSetup/TelegramSetup'))
 
 const INITIAL_FILTERS: FilterState = {
     search: '',
@@ -119,6 +122,8 @@ export default function App() {
     const navigate = useNavigate()
     const location = useLocation()
     const isGridView = location.pathname === '/'
+    const [appStatus, setAppStatus] = useState<'loading' | 'setup_needed' | 'scraping' | 'amenities' | 'ready'>('loading')
+    const [telegramConfigured, setTelegramConfigured] = useState(false)
     const [data, setData] = useState<ListingsData | null>(null)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [sortBy, setSortBy] = useState('price-asc')
@@ -140,6 +145,24 @@ export default function App() {
     }, [])
 
     useEffect(() => {
+        fetch('/api/status')
+            .then(r => r.json())
+            .then(s => {
+                const st = s.status as typeof appStatus
+                setTelegramConfigured(!!s.telegram_configured)
+                if (st === 'scraping' || st === 'amenities') {
+                    setAppStatus(st)
+                } else if (st === 'ready') {
+                    setAppStatus('ready')
+                } else {
+                    setAppStatus('setup_needed')
+                }
+            })
+            .catch(() => setAppStatus('ready'))
+    }, [])
+
+    useEffect(() => {
+        if (appStatus !== 'ready') return
         fetch('/listings.json')
             .then((r) => {
                 if (!r.ok) throw new Error('not found')
@@ -147,7 +170,7 @@ export default function App() {
             })
             .then(setData)
             .catch(() => { })
-    }, [])
+    }, [appStatus])
 
     function handleFileLoad(e: ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
@@ -374,6 +397,20 @@ export default function App() {
         navigate('/')
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [navigate])
+
+    if (appStatus === 'loading') {
+        return <div className="load-screen"><p>Loading...</p></div>
+    }
+
+    if (appStatus === 'setup_needed') {
+        return <SetupWizard onStarted={() => setAppStatus('scraping')} />
+    }
+
+    if (appStatus === 'scraping' || appStatus === 'amenities') {
+        return <SetupProgress onComplete={() => {
+            setAppStatus('ready')
+        }} />
+    }
 
     if (!data) {
         return (
@@ -698,14 +735,18 @@ export default function App() {
                             </Suspense>
                         } />
                         <Route path="/alerts" element={
-                            <Suspense fallback={<div className="no-results">Loading alerts...</div>}>
-                                <Alerts
-                                    propertyTypes={options.propertyTypes}
-                                    furnishTypes={options.furnishTypes}
-                                    bedroomCounts={options.bedroomCounts}
-                                    bathroomCounts={options.bathroomCounts}
-                                    sources={options.sources}
-                                />
+                            <Suspense fallback={<div className="no-results">Loading...</div>}>
+                                {telegramConfigured ? (
+                                    <Alerts
+                                        propertyTypes={options.propertyTypes}
+                                        furnishTypes={options.furnishTypes}
+                                        bedroomCounts={options.bedroomCounts}
+                                        bathroomCounts={options.bathroomCounts}
+                                        sources={options.sources}
+                                    />
+                                ) : (
+                                    <TelegramSetup onComplete={() => setTelegramConfigured(true)} />
+                                )}
                             </Suspense>
                         } />
                     </Routes>

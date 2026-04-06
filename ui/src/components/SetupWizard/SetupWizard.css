@@ -1,0 +1,133 @@
+.setup-wizard {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+}
+
+.setup-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    width: 100%;
+    max-width: 460px;
+    box-shadow: var(--shadow-md);
+}
+
+.setup-card h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-h);
+    margin-bottom: 4px;
+}
+
+.setup-subtitle {
+    color: var(--text-light);
+    font-size: 14px;
+    margin-bottom: 28px;
+}
+
+.setup-field {
+    margin-bottom: 20px;
+}
+
+.setup-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-h);
+    margin-bottom: 6px;
+}
+
+.setup-field input[type="text"],
+.setup-field input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.setup-field input:focus {
+    border-color: var(--accent);
+}
+
+.setup-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+
+.setup-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.setup-toggle button {
+    flex: 1;
+    padding: 9px 16px;
+    border: none;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.setup-toggle button:not(:last-child) {
+    border-right: 1px solid var(--border);
+}
+
+.setup-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.setup-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .setup-error {
+        background: rgba(185, 28, 28, 0.15);
+        color: #fca5a5;
+        border-color: rgba(185, 28, 28, 0.3);
+    }
+}
+
+.setup-submit {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.setup-submit:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.setup-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

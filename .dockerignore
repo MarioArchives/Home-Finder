@@ -8,6 +8,8 @@ ui/dist
 !ui/package-lock.json
 !chat_ids.json
 !alerts.json
+!alerts.seed.json
+!chat_ids.seed.json
 __pycache__
 *.pyc
 .claude

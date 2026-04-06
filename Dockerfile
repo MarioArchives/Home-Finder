@@ -7,6 +7,9 @@ WORKDIR /app/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY ui/ ./
+# Replace broken symlinks with placeholder JSON for the Vite build.
+# At runtime the entrypoint symlinks real data into dist/.
+RUN rm -f public/listings.json public/amenities.json && echo '[]' > public/listings.json && echo '{}' > public/amenities.json
 RUN npm run build
 
 # =============================================================================
@@ -14,26 +17,23 @@ RUN npm run build
 # =============================================================================
 FROM python:3.13-slim
 
-# Install system dependencies for Playwright's Chromium
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-    libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-    libpango-1.0-0 libcairo2 libasound2 libxshmfence1 \
-    fonts-liberation cron curl \
+# Install cron and curl first, then Python deps + Playwright with all its system deps
+RUN apt-get update && apt-get install -y --no-install-recommends cron curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python deps
+# Install Python deps + Playwright Chromium + its system dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
-    playwright install chromium
+    playwright install --with-deps chromium
 
 # Copy Python scripts
 COPY scrape_listings.py check_new_listings.py fetch_amenities.py server.py format_notify.py alert_filter.py update_chats.py ./
 
-# Copy seed data (alerts & chat subscriptions)
-COPY alerts.json chat_ids.json ./
+# Copy clean seed data for Docker (personal alerts.json / chat_ids.json stay local)
+COPY alerts.seed.json /app/alerts.json
+COPY chat_ids.seed.json /app/chat_ids.json
 
 # Copy built UI
 COPY --from=ui-build /app/ui/dist /app/ui/dist

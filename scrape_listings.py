@@ -463,7 +463,7 @@ def _parse_rightmove_card(card, listing_type: str) -> dict:
 def scrape_rightmove(context, city: str, listing_type: str, max_pages: int) -> list[dict]:
     """Scrape Rightmove listings for the given city."""
     page = context.new_page()
-    detail_page = context.new_page()
+    detail_pages = [context.new_page(), context.new_page()]
     listings = []
     seen_urls = set()
 
@@ -519,7 +519,8 @@ def scrape_rightmove(context, city: str, listing_type: str, max_pages: int) -> l
                         end="",
                         flush=True,
                     )
-                    extras = _scrape_rightmove_detail(detail_page, listing["url"])
+                    dp = detail_pages[i % 2]
+                    extras = _scrape_rightmove_detail(dp, listing["url"])
                     listing.update(extras)
                     print(f" done")
                     time.sleep(0.5)
@@ -529,7 +530,8 @@ def scrape_rightmove(context, city: str, listing_type: str, max_pages: int) -> l
             time.sleep(1)
 
     finally:
-        detail_page.close()
+        for dp in detail_pages:
+            dp.close()
         page.close()
 
     print(f"[Rightmove] Collected {len(listings)} listings total.")
@@ -595,7 +597,7 @@ def _parse_zoopla_card(card, listing_type: str) -> dict:
 def scrape_zoopla(context, city: str, listing_type: str, max_pages: int) -> list[dict]:
     """Scrape Zoopla listings for the given city."""
     page = context.new_page()
-    detail_page = context.new_page()
+    detail_pages = [context.new_page(), context.new_page()]
     slug = city.lower().strip().replace(" ", "-")
     listings = []
     seen_urls = set()
@@ -647,7 +649,8 @@ def scrape_zoopla(context, city: str, listing_type: str, max_pages: int) -> list
                         end="",
                         flush=True,
                     )
-                    extras = _scrape_zoopla_detail(detail_page, listing["url"])
+                    dp = detail_pages[i % 2]
+                    extras = _scrape_zoopla_detail(dp, listing["url"])
                     listing.update(extras)
                     print(f" done")
                     time.sleep(0.5)
@@ -657,7 +660,8 @@ def scrape_zoopla(context, city: str, listing_type: str, max_pages: int) -> list
             time.sleep(1)
 
     finally:
-        detail_page.close()
+        for dp in detail_pages:
+            dp.close()
         page.close()
 
     print(f"[Zoopla] Collected {len(listings)} listings total.")
