@@ -47,7 +47,7 @@
 
 .card-details {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   font-size: 13px;
   color: var(--text);
 }
@@ -55,7 +55,13 @@
 .card-detail {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.card-detail svg {
+  color: var(--text-light);
+  flex-shrink: 0;
 }
 
 .card-tags {

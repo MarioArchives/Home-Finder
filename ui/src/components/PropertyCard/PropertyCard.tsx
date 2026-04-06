@@ -2,14 +2,16 @@ import { useState, memo } from 'react'
 import NearbyBadges from '../NearbyBadges/NearbyBadges'
 import PropertyDetailMap from '../PropertyDetailMap/PropertyDetailMap'
 import FloorplanModal from '../FloorplanModal/FloorplanModal'
+import CardDetails from './CardDetails'
+import CardTags from './CardTags'
+import CardActions from './CardActions'
 import type { PropertyCardProps } from './properties'
 import './PropertyCard.css'
 
-function PropertyCard({ listing, nearby, onSelect, valueRating, city }: PropertyCardProps) {
+function PropertyCard({ listing, nearby, onSelect, valueRating, city, commuteDistance, commuteDuration }: PropertyCardProps) {
   const [showMap, setShowMap] = useState(false)
   const [showFloorplan, setShowFloorplan] = useState(false)
   const mainImage = listing.images?.[0]
-  const hasPlaces = (nearby?.places?.length ?? 0) > 0
 
   return (
     <>
@@ -23,38 +25,15 @@ function PropertyCard({ listing, nearby, onSelect, valueRating, city }: Property
           <div className="card-price">{listing.price || 'Price on request'}</div>
           <div className="card-title">{listing.title}</div>
           <div className="card-address">{listing.address}</div>
-          <div className="card-details">
-            {listing.bedrooms != null && (
-              <span className="card-detail">{listing.bedrooms} bed</span>
-            )}
-            {listing.bathrooms != null && (
-              <span className="card-detail">{listing.bathrooms} bath</span>
-            )}
-            {listing.size_sq_ft && (
-              <span className="card-detail">{listing.size_sq_ft}</span>
-            )}
-          </div>
-          <div className="card-tags">
-            <span className="tag">{listing.source}</span>
-            {listing.property_type && <span className="tag">{listing.property_type}</span>}
-            {listing.furnish_type && <span className="tag green">{listing.furnish_type}</span>}
-            {listing.epc_rating && <span className="tag green">EPC {listing.epc_rating}</span>}
-            {listing.council_tax && <span className="tag">{listing.council_tax}</span>}
-            {valueRating && <span className={`tag value-rating ${valueRating.includes('good') ? 'value-good' : 'value-bad'} ${valueRating.startsWith('very') ? 'value-strong' : ''}`}>{valueRating}</span>}
-          </div>
-          <NearbyBadges nearby={nearby} />
-          <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-            {hasPlaces && listing.latitude && (
-              <button className="btn-detail-map" onClick={() => setShowMap(true)}>
-                View nearby places on map
-              </button>
-            )}
-            {listing.floorplan_url && (
-              <button className="btn-detail-map" onClick={() => setShowFloorplan(true)}>
-                View floor plan
-              </button>
-            )}
-          </div>
+          <CardDetails listing={listing} />
+          <CardTags listing={listing} valueRating={valueRating} />
+          <NearbyBadges nearby={nearby} commuteDistance={commuteDistance} commuteDuration={commuteDuration} />
+          <CardActions
+            listing={listing}
+            nearby={nearby}
+            onShowMap={() => setShowMap(true)}
+            onShowFloorplan={() => setShowFloorplan(true)}
+          />
           {listing.description && (
             <div className="card-description">{listing.description}</div>
           )}

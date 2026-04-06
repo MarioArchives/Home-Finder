@@ -110,6 +110,42 @@
     }
 }
 
+/* ===== Amenity selection ===== */
+.setup-amenities {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.setup-amenity-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.setup-amenity-option:hover {
+    background: var(--bg);
+}
+
+.setup-amenity-option input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.setup-amenity-option .amenity-icon {
+    font-size: 16px;
+}
+
 .setup-submit {
     width: 100%;
     padding: 12px;

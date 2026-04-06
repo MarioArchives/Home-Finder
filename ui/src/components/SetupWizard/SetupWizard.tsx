@@ -10,8 +10,21 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
     const [type, setType] = useState<'rent' | 'buy'>('rent')
     const [source, setSource] = useState<'rightmove' | 'zoopla' | 'both'>('rightmove')
     const [pages, setPages] = useState(5)
+    const [amenities, setAmenities] = useState<Record<string, boolean>>({
+        climbing: true,
+        cinema: false,
+        gym: false,
+        parks: false,
+    })
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
+
+    const amenityLabels: Record<string, { label: string; icon: string }> = {
+        climbing: { label: 'Climbing gyms', icon: '\u{1F9D7}' },
+        cinema: { label: 'Cinemas', icon: '\u{1F3AC}' },
+        gym: { label: 'Gyms & fitness', icon: '\u{1F3CB}' },
+        parks: { label: 'Parks', icon: '\u{1F333}' },
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -26,7 +39,13 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
             const res = await fetch('/api/setup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ city: city.trim(), type, source, pages }),
+                body: JSON.stringify({
+                    city: city.trim(),
+                    type,
+                    source,
+                    pages,
+                    amenities: Object.entries(amenities).filter(([, v]) => v).map(([k]) => k).join(','),
+                }),
             })
             if (!res.ok) {
                 const data = await res.json()
@@ -118,6 +137,25 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
                         <span className="setup-hint">
                             Each page has ~25 listings. More pages = more results but takes longer.
                         </span>
+                    </div>
+
+                    <div className="setup-field">
+                        <label>Nearby amenities to search</label>
+                        <span className="setup-hint">
+                            Bars, cafes, and shops are always included. Select additional types to find nearby.
+                        </span>
+                        <div className="setup-amenities">
+                            {Object.entries(amenityLabels).map(([key, { label, icon }]) => (
+                                <label key={key} className="setup-amenity-option">
+                                    <input
+                                        type="checkbox"
+                                        checked={amenities[key]}
+                                        onChange={e => setAmenities(prev => ({ ...prev, [key]: e.target.checked }))}
+                                    />
+                                    <span className="amenity-icon">{icon}</span> {label}
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     {error && <div className="setup-error">{error}</div>}

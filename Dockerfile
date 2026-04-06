@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 # Copy Python scripts
 COPY scrape_listings.py check_new_listings.py fetch_amenities.py server.py format_notify.py alert_filter.py update_chats.py ./
+COPY providers/ ./providers/
 
 # Copy clean seed data for Docker (personal alerts.json / chat_ids.json stay local)
 COPY alerts.seed.json /app/alerts.json

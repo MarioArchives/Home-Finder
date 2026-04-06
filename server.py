@@ -185,7 +185,7 @@ def _parse_amenities_line(line):
         _setup_state["progress"]["message"] = line
 
 
-def _run_setup(city, listing_type, source, pages):
+def _run_setup(city, listing_type, source, pages, amenities="climbing"):
     """Run the scraper and amenities fetch in a background thread."""
     listings_file = _get_listings_file(city, listing_type)
     amenities_file = _get_amenities_file(city, listing_type)
@@ -238,7 +238,7 @@ def _run_setup(city, listing_type, source, pages):
             _setup_state["phase"] = "amenities"
             _setup_state["progress"] = {"message": "Fetching nearby amenities..."}
 
-        cmd = [sys.executable, "/app/fetch_amenities.py", str(listings_file)]
+        cmd = [sys.executable, "/app/fetch_amenities.py", "--amenities", amenities, str(listings_file)]
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
@@ -272,11 +272,12 @@ def _run_setup(city, listing_type, source, pages):
             "listing_type": listing_type,
             "source": source,
             "pages": pages,
+            "amenities": amenities,
         }
         CONFIG_FILE.write_text(json.dumps(config, indent=2))
 
         # Install cron jobs with user's settings
-        _install_cron(city, listing_type, source, pages, listings_file, amenities_file)
+        _install_cron(city, listing_type, source, pages, listings_file, amenities_file, amenities)
 
         with _setup_lock:
             _setup_state["phase"] = "complete"
@@ -288,7 +289,7 @@ def _run_setup(city, listing_type, source, pages):
             _setup_state["error"] = str(e)
 
 
-def _install_cron(city, listing_type, source, pages, listings_file, amenities_file):
+def _install_cron(city, listing_type, source, pages, listings_file, amenities_file, amenities="climbing"):
     """Install cron jobs for periodic scraping."""
     import random
     rand_hour = random.randint(6, 22)
@@ -297,7 +298,7 @@ def _install_cron(city, listing_type, source, pages, listings_file, amenities_fi
     env_file = DATA_DIR / ".env.cron"
     env_vars = {k: v for k, v in os.environ.items()
                 if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_)', k)}
-    env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages)})
+    env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages), "AMENITIES": amenities})
     env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
 
     cron_content = f"""# Re-scrape listings daily at 6am
@@ -307,7 +308,7 @@ def _install_cron(city, listing_type, source, pages, listings_file, amenities_fi
 {rand_min} {rand_hour} * * * cd /app && . {env_file} && python3 /app/check_new_listings.py >> "{DATA_DIR}/cron.log" 2>&1
 
 # Refresh amenities weekly on Sunday at 7am
-0 7 * * 0 cd /app && . {env_file} && python3 /app/fetch_amenities.py "{listings_file}" "{amenities_file}" >> "{DATA_DIR}/cron.log" 2>&1
+0 7 * * 0 cd /app && . {env_file} && python3 /app/fetch_amenities.py --amenities "$AMENITIES" "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
 
 """
     cron_path = Path("/etc/cron.d/property-update")
@@ -501,6 +502,10 @@ class AppHandler(SimpleHTTPRequestHandler):
             })
 
         else:
+            # SPA fallback: serve index.html for paths that aren't static files
+            path = self.translate_path(self.path)
+            if not os.path.exists(path) and not self.path.startswith("/api/"):
+                self.path = "/index.html"
             super().do_GET()
 
     def do_POST(self):
@@ -523,6 +528,7 @@ class AppHandler(SimpleHTTPRequestHandler):
             listing_type = body.get("type", "rent")
             source = body.get("source", "rightmove")
             pages = int(body.get("pages", 5))
+            amenities = body.get("amenities", "climbing")
 
             if not city:
                 self._json_response(400, {"error": "City is required"})
@@ -536,7 +542,7 @@ class AppHandler(SimpleHTTPRequestHandler):
 
             thread = threading.Thread(
                 target=_run_setup,
-                args=(city, listing_type, source, pages),
+                args=(city, listing_type, source, pages, amenities),
                 daemon=True,
             )
             thread.start()

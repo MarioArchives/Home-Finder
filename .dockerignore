@@ -1,15 +1,22 @@
 .git
 .venv
-ui/node_modules
-ui/dist
-*.json
-!requirements.txt
-!ui/package.json
-!ui/package-lock.json
-!chat_ids.json
-!alerts.json
-!alerts.seed.json
-!chat_ids.seed.json
+.claude
+.env
 __pycache__
 *.pyc
-.claude
+
+# Node build deps (rebuilt in Docker)
+ui/node_modules
+ui/dist
+
+# Scraped data (generated at runtime)
+*_listings.json
+*_amenities.json
+
+# Personal data (Docker uses seed files)
+alerts.json
+chat_ids.json
+
+# Exclude all JSON except what Docker needs
+ui/public/listings.json
+ui/public/amenities.json

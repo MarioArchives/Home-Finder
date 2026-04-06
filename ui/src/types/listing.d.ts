@@ -34,17 +34,22 @@ export interface NearbyPlace {
   distance_m: number
 }
 
+export interface ClosestAmenity {
+  name: string
+  distance_m: number
+  lat: number
+  lon: number
+  category: string
+}
+
 export interface NearbyData {
   bars: number
   cafes: number
   shops: number
-  closest_climbing?: {
-    name: string
-    distance_m: number
-    lat: number
-    lon: number
-    category: string
-  }
+  closest_climbing?: ClosestAmenity
+  closest_amenities?: Record<string, ClosestAmenity>
+  commute_distance_m?: number
+  commute_duration_s?: number
   places: NearbyPlace[]
 }
 

@@ -24,10 +24,45 @@ import urllib.parse
 from alert_filter import haversine_metres
 
 
-def fetch_overpass(bbox, climbing_bbox):
-    """Query Overpass API for bars, pubs, cafes, supermarkets, dept stores, malls, and climbing gyms."""
+OPTIONAL_AMENITY_QUERIES = {
+    "climbing": [
+        'node["sport"="climbing"]({bbox})',
+        'way["sport"="climbing"]({bbox})',
+        'node["leisure"="sports_centre"]["sport"="climbing"]({bbox})',
+        'way["leisure"="sports_centre"]["sport"="climbing"]({bbox})',
+    ],
+    "cinema": [
+        'node["amenity"="cinema"]({bbox})',
+        'way["amenity"="cinema"]({bbox})',
+    ],
+    "gym": [
+        'node["leisure"="fitness_centre"]({bbox})',
+        'way["leisure"="fitness_centre"]({bbox})',
+        'node["leisure"="sports_centre"]({bbox})',
+        'way["leisure"="sports_centre"]({bbox})',
+    ],
+    "parks": [
+        'node["leisure"="park"]({bbox})',
+        'way["leisure"="park"]({bbox})',
+        'relation["leisure"="park"]({bbox})',
+    ],
+}
+
+ALL_OPTIONAL_AMENITIES = list(OPTIONAL_AMENITY_QUERIES.keys())
+
+
+def fetch_overpass(bbox, wide_bbox, amenity_types):
+    """Query Overpass API for bars, pubs, cafes, supermarkets, dept stores, malls, and selected optional amenities."""
     south, west, north, east = bbox
-    cs, cw, cn, ce = climbing_bbox
+    ws, ww, wn, we = wide_bbox
+
+    optional_lines = []
+    for atype in amenity_types:
+        queries = OPTIONAL_AMENITY_QUERIES.get(atype, [])
+        for q in queries:
+            optional_lines.append("  " + q.format(bbox=f"{ws},{ww},{wn},{we}"))
+
+    optional_block = "\n".join(optional_lines)
     query = f"""
 [out:json][timeout:90];
 (
@@ -40,10 +75,7 @@ def fetch_overpass(bbox, climbing_bbox):
   way["shop"="supermarket"]({south},{west},{north},{east});
   way["shop"="department_store"]({south},{west},{north},{east});
   way["shop"="mall"]({south},{west},{north},{east});
-  node["sport"="climbing"]({cs},{cw},{cn},{ce});
-  way["sport"="climbing"]({cs},{cw},{cn},{ce});
-  node["leisure"="sports_centre"]["sport"="climbing"]({cs},{cw},{cn},{ce});
-  way["leisure"="sports_centre"]["sport"="climbing"]({cs},{cw},{cn},{ce});
+{optional_block}
 );
 out center;"""
 
@@ -73,6 +105,7 @@ def categorise(element):
     amenity = tags.get("amenity", "")
     shop = tags.get("shop", "")
     sport = tags.get("sport", "")
+    leisure = tags.get("leisure", "")
     if amenity in ("bar", "pub"):
         category = "bars"
     elif amenity == "cafe":
@@ -81,6 +114,12 @@ def categorise(element):
         category = "shops"
     elif sport == "climbing":
         category = "climbing"
+    elif amenity == "cinema":
+        category = "cinema"
+    elif leisure in ("fitness_centre", "sports_centre") and sport != "climbing":
+        category = "gym"
+    elif leisure == "park":
+        category = "parks"
     else:
         return None
     return lat, lon, category, tags.get("name", "")
@@ -99,7 +138,13 @@ def main():
         "--output", default=None,
         help="Output file path. Defaults to <name>_amenities.json.",
     )
+    parser.add_argument(
+        "--amenities", default="climbing",
+        help="Comma-separated optional amenity types to fetch. "
+             f"Available: {','.join(ALL_OPTIONAL_AMENITIES)}. Default: climbing.",
+    )
     args = parser.parse_args()
+    amenity_types = [a.strip() for a in args.amenities.split(",") if a.strip()]
 
     with open(args.listings_file, encoding="utf-8") as f:
         listings_data = json.load(f)
@@ -123,18 +168,19 @@ def main():
         max(lats) + buffer,
         max(lngs) + buffer,
     )
-    # Wider bbox for climbing gyms (~10km) since they're rarer
-    climbing_buffer = 0.1
-    climbing_bbox = (
-        min(lats) - climbing_buffer,
-        min(lngs) - climbing_buffer,
-        max(lats) + climbing_buffer,
-        max(lngs) + climbing_buffer,
+    # Wider bbox for optional amenities (~10km) since they're rarer
+    wide_buffer = 0.1
+    wide_bbox = (
+        min(lats) - wide_buffer,
+        min(lngs) - wide_buffer,
+        max(lats) + wide_buffer,
+        max(lngs) + wide_buffer,
     )
 
     print(f"Querying Overpass API for amenities in bbox {bbox}...")
+    print(f"Optional amenity types: {', '.join(amenity_types)}")
     start = time.time()
-    overpass_data = fetch_overpass(bbox, climbing_bbox)
+    overpass_data = fetch_overpass(bbox, wide_bbox, amenity_types)
     elapsed = time.time() - start
     print(f"Overpass returned {len(overpass_data.get('elements', []))} elements in {elapsed:.1f}s.")
 
@@ -145,47 +191,59 @@ def main():
         if result:
             amenities.append(result)
 
+    # Count core amenities
     bars = sum(1 for a in amenities if a[2] == "bars")
     cafes = sum(1 for a in amenities if a[2] == "cafes")
     shops = sum(1 for a in amenities if a[2] == "shops")
-    climbing_gyms = [a for a in amenities if a[2] == "climbing"]
-    print(f"Parsed {len(amenities)} amenities: {bars} bars/pubs, {cafes} cafes, {shops} shops, {len(climbing_gyms)} climbing gyms.")
 
-    # Compute per-property nearby amenities with full detail
+    # Group optional amenities by type
+    optional_pools = {}
+    for atype in amenity_types:
+        pool = [a for a in amenities if a[2] == atype]
+        optional_pools[atype] = pool
+        print(f"  {atype}: {len(pool)} found")
+
+    print(f"Parsed {len(amenities)} amenities: {bars} bars/pubs, {cafes} cafes, {shops} shops.")
+
+    # Core categories counted within radius; optional categories find closest (no limit)
+    core_categories = {"bars", "cafes", "shops"}
     radius = args.radius
     results = {}
     for listing in with_coords:
         key = listing.get("url") or f"{listing['latitude']},{listing['longitude']}"
         nearby_list = []
         for lat, lon, category, name in amenities:
-            dist = haversine_metres(listing["latitude"], listing["longitude"], lat, lon)
-            if category != "climbing" and dist <= radius:
-                nearby_list.append({
-                    "lat": lat,
-                    "lon": lon,
-                    "category": category,
-                    "name": name,
-                    "distance_m": round(dist),
-                })
+            if category in core_categories:
+                dist = haversine_metres(listing["latitude"], listing["longitude"], lat, lon)
+                if dist <= radius:
+                    nearby_list.append({
+                        "lat": lat, "lon": lon, "category": category,
+                        "name": name, "distance_m": round(dist),
+                    })
         nearby_list.sort(key=lambda x: x["distance_m"])
 
-        # Find closest climbing gym (no radius limit)
-        closest_climbing = None
-        for lat, lon, category, name in climbing_gyms:
-            dist = haversine_metres(listing["latitude"], listing["longitude"], lat, lon)
-            entry = {"lat": lat, "lon": lon, "category": "climbing", "name": name, "distance_m": round(dist)}
-            if closest_climbing is None or dist < closest_climbing["distance_m"]:
-                closest_climbing = entry
-        if closest_climbing:
-            nearby_list.append(closest_climbing)
+        # Find closest for each optional amenity type
+        closest = {}
+        for atype, pool in optional_pools.items():
+            best = None
+            for lat, lon, category, name in pool:
+                dist = haversine_metres(listing["latitude"], listing["longitude"], lat, lon)
+                entry = {"lat": lat, "lon": lon, "category": atype, "name": name, "distance_m": round(dist)}
+                if best is None or dist < best["distance_m"]:
+                    best = entry
+            if best:
+                closest[atype] = best
+                nearby_list.append(best)
 
-        results[key] = {
+        result_entry = {
             "bars": sum(1 for a in nearby_list if a["category"] == "bars"),
             "cafes": sum(1 for a in nearby_list if a["category"] == "cafes"),
             "shops": sum(1 for a in nearby_list if a["category"] == "shops"),
-            "closest_climbing": closest_climbing,
+            "closest_climbing": closest.get("climbing"),
+            "closest_amenities": closest,
             "places": nearby_list,
         }
+        results[key] = result_entry
 
     # Build output
     output_file = args.output
@@ -196,11 +254,16 @@ def main():
         else:
             output_file = base + "_amenities.json"
 
+    breakdown = {"bars_pubs": bars, "cafes": cafes, "shops": shops}
+    for atype, pool in optional_pools.items():
+        breakdown[atype] = len(pool)
+
     output = {
         "source_file": args.listings_file,
         "radius_metres": radius,
         "total_amenities_found": len(amenities),
-        "amenity_breakdown": {"bars_pubs": bars, "cafes": cafes, "shops": shops, "climbing_gyms": len(climbing_gyms)},
+        "amenity_types": amenity_types,
+        "amenity_breakdown": breakdown,
         "generated_at": __import__("datetime").datetime.now().isoformat(),
         "properties": results,
     }

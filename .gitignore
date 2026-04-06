@@ -8,8 +8,19 @@ __pycache__/
 ui/node_modules/
 ui/dist/
 
-# Environment
+# Environment — only .env.example is committed
 .env
+.env.docker
+
+# Personal data — use seed files for Docker, these are local-only
+alerts.json
+chat_ids.json
+
+# Scraped data
+*_listings.json
+*_amenities.json
+ui/public/listings.json
+ui/public/amenities.json
 
 # OS
 .DS_Store

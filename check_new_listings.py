@@ -20,8 +20,9 @@ import urllib.parse
 from email.mime.text import MIMEText
 from pathlib import Path
 
-from scrape_listings import create_browser, scrape_rightmove, scrape_zoopla
+from scrape_listings import create_browser, scrape_source
 from playwright.sync_api import sync_playwright
+from providers import get_all_provider_names
 from alert_filter import matches_alert, parse_price, SHARE_KEYWORDS
 from format_notify import load_amenities, format_alert_summary, format_listing
 
@@ -175,13 +176,13 @@ def main():
     with sync_playwright() as pw:
         browser, context = create_browser(pw)
         try:
-            if SOURCE in ("rightmove", "both"):
+            if SOURCE in ("all", "both"):
+                sources = get_all_provider_names()
+            else:
+                sources = [s.strip() for s in SOURCE.split(",")]
+            for source_name in sources:
                 all_listings.extend(
-                    scrape_rightmove(context, CITY, LISTING_TYPE, MAX_PAGES)
-                )
-            if SOURCE in ("zoopla", "both"):
-                all_listings.extend(
-                    scrape_zoopla(context, CITY, LISTING_TYPE, MAX_PAGES)
+                    scrape_source(context, source_name, CITY, LISTING_TYPE, MAX_PAGES)
                 )
         finally:
             context.close()

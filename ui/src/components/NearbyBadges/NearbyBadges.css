@@ -26,3 +26,13 @@
 .nearby-icon {
   font-size: 14px;
 }
+
+.commute-badge {
+  border-color: var(--accent);
+  background: var(--accent-light, rgba(74, 125, 255, 0.08));
+}
+
+.commute-time {
+  color: var(--text-light);
+  font-size: 11px;
+}

@@ -6,4 +6,6 @@ export interface PropertyCardProps {
   onSelect?: (listing: Listing) => void
   valueRating?: string
   city?: string
+  commuteDistance?: number | null
+  commuteDuration?: number | null
 }

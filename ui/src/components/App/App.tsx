@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, type
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
-import { parsePrice, parseSqFt, parseAvailableDate, haversineMetres, fetchNearbyAmenities } from '../../shared/utils/utils'
+import { parsePrice, parseSqFt, parseAvailableDate, haversineMetres, fetchNearbyAmenities, fetchCommuteTimes } from '../../shared/utils/utils'
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet'
 import PropertyCard from '../PropertyCard/PropertyCard'
 import MapView from '../MapView/MapView'
@@ -70,8 +70,8 @@ function PinPickerPopup({ lat, lng, radius, onSubmit, onClose }: {
                 <div className="pin-picker-header">
                     <span className="pin-picker-label">
                         {hasPin
-                            ? `Pin: ${pendingLat!.toFixed(4)}, ${pendingLng!.toFixed(4)} — ${radius}km radius`
-                            : `Click the map to drop a pin (${radius}km radius)`}
+                            ? `Pin: ${pendingLat!.toFixed(4)}, ${pendingLng!.toFixed(4)}${radius > 0 ? ` — ${radius}km radius` : ''}`
+                            : radius > 0 ? `Click the map to drop a pin (${radius}km radius)` : 'Click the map to set your location'}
                     </span>
                     <button className="pin-picker-close" onClick={onClose}>&times;</button>
                 </div>
@@ -84,11 +84,13 @@ function PinPickerPopup({ lat, lng, radius, onSubmit, onClose }: {
                     {hasPin && (
                         <>
                             <Marker position={[pendingLat!, pendingLng!]} />
-                            <Circle
-                                center={[pendingLat!, pendingLng!]}
-                                radius={radius * 1000}
-                                pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.1, weight: 2 }}
-                            />
+                            {radius > 0 && (
+                                <Circle
+                                    center={[pendingLat!, pendingLng!]}
+                                    radius={radius * 1000}
+                                    pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.1, weight: 2 }}
+                                />
+                            )}
                         </>
                     )}
                 </MapContainer>
@@ -136,6 +138,11 @@ export default function App() {
     const [showPinPopup, setShowPinPopup] = useState(false)
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
     const [showMoreFilters, setShowMoreFilters] = useState(false)
+    const [workPinLat, setWorkPinLat] = useState(() => localStorage.getItem('workPinLat') || '')
+    const [workPinLng, setWorkPinLng] = useState(() => localStorage.getItem('workPinLng') || '')
+    const [showWorkPinPopup, setShowWorkPinPopup] = useState(false)
+    const [commuteData, setCommuteData] = useState<Record<string, { distance_m: number; duration_s: number }>>({})
+    const [commuteStatus, setCommuteStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
     const updateSearchFilter = useCallback((value: string) => {
@@ -223,6 +230,33 @@ export default function App() {
                     .catch(() => setNearbyStatus('error'))
             })
     }, [data])
+
+    useEffect(() => {
+        if (workPinLat) localStorage.setItem('workPinLat', workPinLat)
+        else localStorage.removeItem('workPinLat')
+        if (workPinLng) localStorage.setItem('workPinLng', workPinLng)
+        else localStorage.removeItem('workPinLng')
+    }, [workPinLat, workPinLng])
+
+    useEffect(() => {
+        if (!workPinLat || !workPinLng || !data?.listings?.length) return
+        const lat = parseFloat(workPinLat)
+        const lng = parseFloat(workPinLng)
+        if (isNaN(lat) || isNaN(lng)) return
+
+        const withCoords = data.listings
+            .filter((l) => l.latitude && l.longitude && l.url)
+            .map((l) => ({ url: l.url, latitude: l.latitude!, longitude: l.longitude! }))
+        if (withCoords.length === 0) return
+
+        setCommuteStatus('loading')
+        fetchCommuteTimes(withCoords, lat, lng)
+            .then((results) => {
+                setCommuteData(results)
+                setCommuteStatus('done')
+            })
+            .catch(() => setCommuteStatus('error'))
+    }, [workPinLat, workPinLng, data])
 
     const listings = useMemo(() => data?.listings || [], [data])
 
@@ -352,7 +386,11 @@ export default function App() {
             return true
         })
 
-        const getClimbingDist = (url: string) => nearbyCounts[url]?.closest_climbing?.distance_m ?? Infinity
+        const getClimbingDist = (url: string) => {
+            const n = nearbyCounts[url]
+            return n?.closest_climbing?.distance_m ?? n?.closest_amenities?.climbing?.distance_m ?? Infinity
+        }
+        const getCinemaDist = (url: string) => nearbyCounts[url]?.closest_amenities?.cinema?.distance_m ?? Infinity
         const getLiveliness = (url: string) => {
             const n = nearbyCounts[url]
             return n ? n.bars + n.cafes + n.shops : 0
@@ -364,6 +402,12 @@ export default function App() {
             if (!hasCustomCoords || !l.latitude || !l.longitude) return Infinity
             return haversineMetres(l.latitude, l.longitude, parsedCustomLat, parsedCustomLng)
         }
+        const getWorkDist = (l: typeof result[0]) => {
+            const parsedWorkLat = parseFloat(workPinLat)
+            const parsedWorkLng = parseFloat(workPinLng)
+            if (isNaN(parsedWorkLat) || isNaN(parsedWorkLng) || !l.latitude || !l.longitude) return Infinity
+            return commuteData[l.url]?.distance_m ?? haversineMetres(l.latitude, l.longitude, parsedWorkLat, parsedWorkLng)
+        }
 
         result.sort((a, b) => {
             const pa = parsePrice(a.price) ?? Infinity
@@ -374,14 +418,16 @@ export default function App() {
                 case 'beds-desc': return (b.bedrooms ?? 0) - (a.bedrooms ?? 0)
                 case 'beds-asc': return (a.bedrooms ?? 0) - (b.bedrooms ?? 0)
                 case 'climbing-asc': return getClimbingDist(a.url) - getClimbingDist(b.url)
+                case 'cinema-asc': return getCinemaDist(a.url) - getCinemaDist(b.url)
                 case 'liveliness-desc': return getLiveliness(b.url) - getLiveliness(a.url)
                 case 'custom-dist-asc': return getCustomDist(a) - getCustomDist(b)
+                case 'commute-asc': return getWorkDist(a) - getWorkDist(b)
                 default: return 0
             }
         })
 
         return result
-    }, [listings, filters, debouncedSearch, sortBy, nearbyCounts, customLat, customLng])
+    }, [listings, filters, debouncedSearch, sortBy, nearbyCounts, customLat, customLng, commuteData, workPinLat, workPinLng])
 
     useEffect(() => { setPage(1) }, [filtered])
 
@@ -639,7 +685,9 @@ export default function App() {
                                 <option value="beds-desc">Bedrooms: most first</option>
                                 <option value="beds-asc">Bedrooms: fewest first</option>
                                 <option value="climbing-asc">Nearest climbing gym</option>
+                                <option value="cinema-asc">Nearest cinema</option>
                                 <option value="liveliness-desc">Most lively (amenities)</option>
+                                <option value="commute-asc">Shortest commute to work</option>
                                 <option value="custom-dist-asc">Nearest to custom location</option>
                             </select>
                         </div>
@@ -673,6 +721,41 @@ export default function App() {
                     </div>
                 )}
 
+                {isGridView && sortBy === 'commute-asc' && !workPinLat && (
+                    <div className="custom-coords-bar">
+                        <span className="custom-coords-label">Set your work location to sort by commute distance.</span>
+                        <button className="btn-set-work-pin" onClick={() => setShowWorkPinPopup(true)}>
+                            Set work location
+                        </button>
+                    </div>
+                )}
+
+                {workPinLat && workPinLng && (
+                    <div className="pin-active-bar work-pin-bar">
+                        <span>&#128188; Work: {parseFloat(workPinLat).toFixed(4)}, {parseFloat(workPinLng).toFixed(4)}</span>
+                        {commuteStatus === 'loading' && <span className="commute-loading">Fetching commute times...</span>}
+                        {commuteStatus === 'done' && <span className="commute-loaded">{Object.keys(commuteData).length} commute times loaded</span>}
+                        {commuteStatus === 'error' && <span className="commute-error">Could not fetch commute times (using straight-line distance)</span>}
+                        <button className="pin-change-btn" onClick={() => setShowWorkPinPopup(true)}>Change</button>
+                        <button className="pin-change-btn" onClick={() => { setWorkPinLat(''); setWorkPinLng(''); setCommuteData({}); setCommuteStatus('idle') }}>Remove</button>
+                    </div>
+                )}
+
+            {showWorkPinPopup && (
+                <PinPickerPopup
+                    lat={workPinLat}
+                    lng={workPinLng}
+                    radius={0}
+                    onSubmit={(lat: number, lng: number) => {
+                        setWorkPinLat(String(lat))
+                        setWorkPinLng(String(lng))
+                        setShowWorkPinPopup(false)
+                        if (sortBy !== 'commute-asc') setSortBy('commute-asc')
+                    }}
+                    onClose={() => setShowWorkPinPopup(false)}
+                />
+            )}
+
             {showPinPopup && filters.pinRadius && (
                 <PinPickerPopup
                     lat={filters.pinLat}
@@ -696,11 +779,11 @@ export default function App() {
             )}
 
             <main className="app-main">
-                {filtered.length === 0 ? (
-                    <div className="no-results">No properties match your filters.</div>
-                ) : (
-                    <Routes>
-                        <Route path="/" element={
+                <Routes>
+                    <Route path="/" element={
+                        filtered.length === 0 ? (
+                            <div className="no-results">No properties match your filters.</div>
+                        ) : (
                             <>
                                 <div className="listings-grid">
                                     {paged.map((listing, i) => (
@@ -711,6 +794,8 @@ export default function App() {
                                             onSelect={setSelectedListing}
                                             valueRating={valueRatings[listing.url]}
                                             city={data?.city}
+                                            commuteDistance={commuteData[listing.url]?.distance_m ?? (workPinLat && workPinLng && listing.latitude && listing.longitude ? haversineMetres(listing.latitude, listing.longitude, parseFloat(workPinLat), parseFloat(workPinLng)) : null)}
+                                            commuteDuration={commuteData[listing.url]?.duration_s ?? null}
                                         />
                                     ))}
                                 </div>
@@ -725,32 +810,39 @@ export default function App() {
                                     </div>
                                 )}
                             </>
-                        } />
-                        <Route path="/map" element={
-                            <MapView listings={filtered} nearbyCounts={nearbyCounts} />
-                        } />
-                        <Route path="/analytics" element={
-                            <Suspense fallback={<div className="no-results">Loading analytics...</div>}>
-                                <Analytics listings={filtered} nearbyCounts={nearbyCounts} onDrillDown={handleDrillDown} onSelectListing={setSelectedListing} />
-                            </Suspense>
-                        } />
-                        <Route path="/alerts" element={
-                            <Suspense fallback={<div className="no-results">Loading...</div>}>
-                                {telegramConfigured ? (
-                                    <Alerts
-                                        propertyTypes={options.propertyTypes}
-                                        furnishTypes={options.furnishTypes}
-                                        bedroomCounts={options.bedroomCounts}
-                                        bathroomCounts={options.bathroomCounts}
-                                        sources={options.sources}
-                                    />
-                                ) : (
-                                    <TelegramSetup onComplete={() => setTelegramConfigured(true)} />
-                                )}
-                            </Suspense>
-                        } />
-                    </Routes>
-                )}
+                        )
+                    } />
+                    <Route path="/map" element={
+                        <MapView listings={filtered} nearbyCounts={nearbyCounts} />
+                    } />
+                    <Route path="/analytics" element={
+                        <Suspense fallback={<div className="no-results">Loading analytics...</div>}>
+                            <Analytics listings={filtered} nearbyCounts={nearbyCounts} onDrillDown={handleDrillDown} onSelectListing={setSelectedListing} />
+                        </Suspense>
+                    } />
+                    <Route path="/alerts" element={
+                        <Suspense fallback={<div className="no-results">Loading...</div>}>
+                            {telegramConfigured ? (
+                                <Alerts
+                                    propertyTypes={options.propertyTypes}
+                                    furnishTypes={options.furnishTypes}
+                                    bedroomCounts={options.bedroomCounts}
+                                    bathroomCounts={options.bathroomCounts}
+                                    sources={options.sources}
+                                />
+                            ) : (
+                                <TelegramSetup onComplete={() => setTelegramConfigured(true)} />
+                            )}
+                        </Suspense>
+                    } />
+                    <Route path="*" element={
+                        <div className="not-found">
+                            <h2>404</h2>
+                            <p>Page not found</p>
+                            <NavLink to="/" className="not-found-link">Back to listings</NavLink>
+                        </div>
+                    } />
+                </Routes>
             </main>
 
             {selectedListing && (

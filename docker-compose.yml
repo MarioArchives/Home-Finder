@@ -7,7 +7,7 @@ services:
     volumes:
       - data:/app/data
     env_file:
-      - .env.docker
+      - .env.example
 
 volumes:
   data:
