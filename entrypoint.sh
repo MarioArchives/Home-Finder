@@ -53,7 +53,7 @@ if [ -f "$CONFIG_FILE" ]; then
     # Re-scrape listings if older than 24 hours
     if [ "$LISTINGS_AGE" -ge 24 ]; then
         echo "[catchup] Listings are ${LISTINGS_AGE}h old (>24h), re-scraping..."
-        python3 /app/scrape_listings.py \
+        python3 /app/src/scrape_listings.py \
             --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" \
             --output "$LISTINGS_FILE" >> "$DATA_DIR/cron.log" 2>&1 &
         SCRAPE_PID=$!
@@ -78,7 +78,7 @@ if [ -f "$CONFIG_FILE" ]; then
     # Refresh amenities if older than 7 days (weekly schedule)
     if [ "$AMENITIES_AGE" -ge 168 ]; then
         echo "[catchup] Amenities are ${AMENITIES_AGE}h old (>7d), refreshing..."
-        python3 /app/fetch_amenities.py --amenities "$AMENITIES" "$LISTINGS_FILE" \
+        python3 /app/src/fetch_amenities.py --amenities "$AMENITIES" "$LISTINGS_FILE" \
             >> "$DATA_DIR/cron.log" 2>&1 || echo "[catchup] Amenities refresh failed"
         [ -f "$AMENITIES_FILE" ] && ln -sf "$AMENITIES_FILE" "$UI_DIR/amenities.json"
     fi

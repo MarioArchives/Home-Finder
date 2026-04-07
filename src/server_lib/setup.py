@@ -78,7 +78,7 @@ def run_setup(city, listing_type, source, pages, amenities="climbing", pin_data=
 
     try:
         cmd = [
-            sys.executable, "/app/scrape_listings.py",
+            sys.executable, "/app/src/scrape_listings.py",
             "--city", city,
             "--type", listing_type,
             "--pages", str(pages),
@@ -109,7 +109,7 @@ def run_setup(city, listing_type, source, pages, amenities="climbing", pin_data=
             setup_state["phase"] = "amenities"
             setup_state["progress"] = {"message": "Fetching nearby amenities..."}
 
-        cmd = [sys.executable, "/app/fetch_amenities.py", "--amenities", amenities, str(listings_file)]
+        cmd = [sys.executable, "/app/src/fetch_amenities.py", "--amenities", amenities, str(listings_file)]
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
@@ -168,18 +168,18 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
 
     env_file = DATA_DIR / ".env.cron"
     env_vars = {k: v for k, v in os.environ.items()
-                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_)', k)}
-    env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages), "AMENITIES": amenities})
+                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_|PYTHONPATH)', k)}
+    env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages), "AMENITIES": amenities, "PYTHONPATH": "/app/src"})
     env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
 
     cron_content = f"""# Re-scrape listings daily at 6am
-0 6 * * * cd /app && . {env_file} && python3 /app/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
+0 6 * * * cd /app && . {env_file} && python3 /app/src/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
 
 # Check alerts for new listings at a random daily time ({rand_hour}:{rand_min:02d})
 {rand_min} {rand_hour} * * * cd /app && . {env_file} && python3 -m alerts.check_new_listings >> "{DATA_DIR}/cron.log" 2>&1 && touch "{DATA_DIR}/.last_alert_check"
 
 # Refresh amenities weekly on Sunday at 7am
-0 7 * * 0 cd /app && . {env_file} && python3 /app/fetch_amenities.py --amenities "$AMENITIES" "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
+0 7 * * 0 cd /app && . {env_file} && python3 /app/src/fetch_amenities.py --amenities "$AMENITIES" "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
 
 """
     cron_path = Path("/etc/cron.d/property-update")

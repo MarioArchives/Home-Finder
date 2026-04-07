@@ -8,7 +8,7 @@ from pathlib import Path
 
 def _load_dotenv():
     """Load .env file from the project root if it exists."""
-    env_path = Path(__file__).parent.parent / ".env"
+    env_path = Path(__file__).parent.parent.parent / ".env"
     if not env_path.exists():
         return
     for line in env_path.read_text().splitlines():
@@ -22,7 +22,7 @@ def _load_dotenv():
 
 _load_dotenv()
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"))
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent.parent / "data"))
 CITY = os.environ.get("CITY", "Manchester")
 LISTING_TYPE = os.environ.get("LISTING_TYPE", "rent")
 ALERTS_FILE = DATA_DIR / "alerts.json"

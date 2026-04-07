@@ -5,7 +5,8 @@ FROM node:22-slim AS ui-build
 
 WORKDIR /app/ui
 COPY ui/package.json ui/package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 COPY ui/ ./
 # Replace broken symlinks with placeholder JSON for the Vite build.
 # At runtime the entrypoint symlinks real data into dist/.
@@ -17,22 +18,28 @@ RUN npm run build
 # =============================================================================
 FROM python:3.13-slim
 
-# Install cron and curl first, then Python deps + Playwright with all its system deps
-RUN apt-get update && apt-get install -y --no-install-recommends cron curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install cron and curl first
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends cron curl
 
 WORKDIR /app
 
-# Install Python deps + Playwright Chromium + its system dependencies
+# Install Python deps (cached separately from Playwright)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Install Playwright Chromium + its system dependencies (heaviest layer, cached independently)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     playwright install --with-deps chromium
 
-# Copy Python scripts
-COPY scrape_listings.py fetch_amenities.py server.py ./
-COPY providers/ ./providers/
-COPY server_lib/ ./server_lib/
-COPY alerts/ ./alerts/
+# Copy Python entry point and source
+COPY server.py ./
+COPY src/ ./src/
+
+ENV PYTHONPATH="/app/src"
 
 # Copy clean seed data for Docker (personal alerts.json / chat_ids.json stay local)
 COPY data/alerts.seed.json /app/alerts.json

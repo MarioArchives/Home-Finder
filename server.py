@@ -53,32 +53,30 @@ class AppHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
-        body = self._read_json_body()
-
         if self.path == "/api/setup":
-            if body is None:
-                return
+            body = self._read_json_body()
+            if body is None: return
             handle_setup_post(self, body)
 
         elif (m := re.match(r"^/api/alerts/([^/]+)/test$", self.path)):
             handle_alert_test(self, m.group(1))
 
         elif self.path == "/api/alerts":
-            if body is None:
-                return
+            body = self._read_json_body()
+            if body is None: return
             handle_alerts_post(self, body)
 
         elif self.path == "/api/telegram/setup":
-            if body is None:
-                return
+            body = self._read_json_body()
+            if body is None: return
             handle_telegram_setup(self, body)
 
         elif self.path == "/api/telegram/discover-chats":
             handle_discover_chats(self)
 
         elif self.path == "/api/telegram/add-chat":
-            if body is None:
-                return
+            body = self._read_json_body()
+            if body is None: return
             handle_add_chat(self, body)
 
         else:

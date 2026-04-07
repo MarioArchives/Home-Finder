@@ -4,7 +4,8 @@ import json
 import urllib.request
 import urllib.parse
 
-from .config import ALERTS_FILE, CHATS_FILE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from . import config as cfg
+from .config import ALERTS_FILE, CHATS_FILE
 
 
 def load_alerts() -> list[dict]:
@@ -36,7 +37,7 @@ def save_chats(chats: list[dict]):
 def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
     chats = load_chats()
     if not chats:
-        return [TELEGRAM_CHAT_ID] if TELEGRAM_CHAT_ID else []
+        return [cfg.TELEGRAM_CHAT_ID] if cfg.TELEGRAM_CHAT_ID else []
     result = []
     for chat in chats:
         subscribed = chat.get("alert_ids")
@@ -46,13 +47,13 @@ def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
 
 
 def send_telegram(text: str, chat_id: str | None = None):
-    if not TELEGRAM_BOT_TOKEN:
+    if not cfg.TELEGRAM_BOT_TOKEN:
         print(f"[Telegram] Not configured. Message:\n{text}")
         return
     if not chat_id:
         print("[Telegram] No chat ID provided, skipping.")
         return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{cfg.TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": text,
