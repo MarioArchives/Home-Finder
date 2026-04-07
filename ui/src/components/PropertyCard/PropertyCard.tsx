@@ -8,7 +8,7 @@ import CardActions from './CardActions'
 import type { PropertyCardProps } from './properties'
 import './PropertyCard.css'
 
-function PropertyCard({ listing, nearby, onSelect, valueRating, city, commuteDistance, commuteDuration }: PropertyCardProps) {
+function PropertyCard({ listing, nearby, onSelect, valueRating, city, commuteDistance, commuteDuration, pinDistances }: PropertyCardProps) {
   const [showMap, setShowMap] = useState(false)
   const [showFloorplan, setShowFloorplan] = useState(false)
   const mainImage = listing.images?.[0]
@@ -27,7 +27,7 @@ function PropertyCard({ listing, nearby, onSelect, valueRating, city, commuteDis
           <div className="card-address">{listing.address}</div>
           <CardDetails listing={listing} />
           <CardTags listing={listing} valueRating={valueRating} />
-          <NearbyBadges nearby={nearby} commuteDistance={commuteDistance} commuteDuration={commuteDuration} />
+          <NearbyBadges nearby={nearby} commuteDistance={commuteDistance} commuteDuration={commuteDuration} pinDistances={pinDistances} />
           <CardActions
             listing={listing}
             nearby={nearby}

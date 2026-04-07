@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from alert_filter import haversine_metres
+from alerts.alert_filter import haversine_metres
 
 
 def load_amenities(data_dir: Path, city: str, listing_type: str) -> dict:
@@ -133,10 +133,23 @@ def format_listing(listing: dict, alert: dict | None = None,
         if nearby:
             parts.append(f"☕ Nearby: {', '.join(nearby)}")
 
-        climbing = props.get("closest_climbing")
-        if climbing:
-            dist_km = climbing["distance_m"] / 1000
-            parts.append(f"🧗 Nearest climbing: {climbing.get('name', '?')} ({dist_km:.1f}km)")
+        # Closest amenities (climbing, cinema, gym, parks, etc.)
+        amenity_icons = {
+            "climbing": "🧗",
+            "cinema": "🎬",
+            "gym": "🏋",
+            "parks": "🌳",
+        }
+        closest_amenities = props.get("closest_amenities", {})
+        # Backwards compat: old data has closest_climbing at top level
+        if not closest_amenities.get("climbing") and props.get("closest_climbing"):
+            closest_amenities["climbing"] = props["closest_climbing"]
+        for atype, entry in closest_amenities.items():
+            if entry and "distance_m" in entry:
+                icon = amenity_icons.get(atype, "📌")
+                dist_km = entry["distance_m"] / 1000
+                name = entry.get("name", "?")
+                parts.append(f"{icon} Nearest {atype}: {name} ({dist_km:.1f}km)")
 
     if url:
         parts.append(f"\n<a href=\"{url}\">View listing</a>")

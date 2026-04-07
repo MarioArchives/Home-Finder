@@ -10,12 +10,16 @@ ui/node_modules
 ui/dist
 
 # Scraped data (generated at runtime)
-*_listings.json
-*_amenities.json
+data/*_listings.json
+data/*_amenities.json
 
-# Personal data (Docker uses seed files)
-alerts.json
-chat_ids.json
+# Personal data (Docker uses seed files — only seed files are copied)
+data/alerts.json
+data/chat_ids.json
+data/seen_listings.json
+data/config.json
+data/cron.log
+data/.env.*
 
 # Exclude all JSON except what Docker needs
 ui/public/listings.json

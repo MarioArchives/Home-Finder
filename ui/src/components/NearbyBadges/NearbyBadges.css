@@ -36,3 +36,8 @@
   color: var(--text-light);
   font-size: 11px;
 }
+
+.pin-badge {
+  border-color: var(--green, #10b981);
+  background: var(--green-light, rgba(16, 185, 129, 0.08));
+}

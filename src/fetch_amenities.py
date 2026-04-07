@@ -21,7 +21,7 @@ import time
 import urllib.request
 import urllib.parse
 
-from alert_filter import haversine_metres
+from alerts.alert_filter import haversine_metres
 
 
 OPTIONAL_AMENITY_QUERIES = {

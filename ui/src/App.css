@@ -479,6 +479,127 @@
   opacity: 0.9;
 }
 
+/* ===== Custom pins bar ===== */
+.custom-pins-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.custom-pin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--green, #10b981);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.custom-pin-emoji {
+  font-size: 16px;
+}
+
+.custom-pin-label {
+  font-weight: 500;
+}
+
+.custom-pin-remove {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 2px;
+}
+
+.custom-pin-remove:hover {
+  color: #ef4444;
+}
+
+.btn-add-pin {
+  padding: 5px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  background: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-add-pin:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ===== Add pin popup ===== */
+.add-pin-popup {
+  max-width: 600px;
+}
+
+.add-pin-fields {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.add-pin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.add-pin-field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-light);
+}
+
+.add-pin-field input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.add-pin-field input:focus {
+  border-color: var(--accent);
+}
+
+.add-pin-field-grow {
+  flex: 1;
+}
+
+.add-pin-emoji-input {
+  width: 50px;
+  text-align: center;
+  font-size: 20px !important;
+}
+
+.add-pin-hint {
+  padding: 0 16px 8px;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.pin-picker-coords {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
 /* ===== Sort bar (inside header) ===== */
 .sort-bar {
   display: flex;

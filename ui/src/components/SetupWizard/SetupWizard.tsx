@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PinPickerInner } from '../PinPicker/PinPicker'
 import './SetupWizard.css'
 
 interface SetupWizardProps {
@@ -16,6 +17,11 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
         gym: false,
         parks: false,
     })
+    const [showPin, setShowPin] = useState(false)
+    const [pinLabel, setPinLabel] = useState('')
+    const [pinEmoji, setPinEmoji] = useState('\u{1F4CD}')
+    const [pinLat, setPinLat] = useState<number | null>(null)
+    const [pinLng, setPinLng] = useState<number | null>(null)
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
@@ -45,6 +51,12 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
                     source,
                     pages,
                     amenities: Object.entries(amenities).filter(([, v]) => v).map(([k]) => k).join(','),
+                    ...(pinLat != null && pinLng != null && pinLabel.trim() ? {
+                        pin_lat: pinLat,
+                        pin_lng: pinLng,
+                        pin_label: pinLabel.trim(),
+                        pin_emoji: pinEmoji || '\u{1F4CD}',
+                    } : {}),
                 }),
             })
             if (!res.ok) {
@@ -156,6 +168,46 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="setup-field">
+                        <label className="setup-amenity-option setup-pin-toggle">
+                            <input
+                                type="checkbox"
+                                checked={showPin}
+                                onChange={e => { setShowPin(e.target.checked); if (!e.target.checked) { setPinLat(null); setPinLng(null) } }}
+                            />
+                            <span className="amenity-icon">{'\u{1F4CD}'}</span> Set a location pin
+                        </label>
+                        <span className="setup-hint">
+                            Optionally drop a pin to track distance from each property to a specific location.
+                        </span>
+                        {showPin && (
+                            <div className="setup-pin-section">
+                                <div className="setup-pin-inputs">
+                                    <input
+                                        type="text"
+                                        placeholder="Emoji"
+                                        value={pinEmoji}
+                                        onChange={e => setPinEmoji(e.target.value.slice(0, 4))}
+                                        className="setup-pin-emoji"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Label (e.g. Office, Gym)"
+                                        value={pinLabel}
+                                        onChange={e => setPinLabel(e.target.value)}
+                                        className="setup-pin-label"
+                                    />
+                                </div>
+                                {pinLat != null && pinLng != null && (
+                                    <div className="setup-pin-coords">
+                                        Pin set: {pinLat.toFixed(4)}, {pinLng.toFixed(4)}
+                                    </div>
+                                )}
+                                <PinPickerInner onConfirm={(lat, lng) => { setPinLat(lat); setPinLng(lng) }} />
+                            </div>
+                        )}
                     </div>
 
                     {error && <div className="setup-error">{error}</div>}

@@ -29,12 +29,14 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install --with-deps chromium
 
 # Copy Python scripts
-COPY scrape_listings.py check_new_listings.py fetch_amenities.py server.py format_notify.py alert_filter.py update_chats.py ./
+COPY scrape_listings.py fetch_amenities.py server.py ./
 COPY providers/ ./providers/
+COPY server_lib/ ./server_lib/
+COPY alerts/ ./alerts/
 
 # Copy clean seed data for Docker (personal alerts.json / chat_ids.json stay local)
-COPY alerts.seed.json /app/alerts.json
-COPY chat_ids.seed.json /app/chat_ids.json
+COPY data/alerts.seed.json /app/alerts.json
+COPY data/chat_ids.seed.json /app/chat_ids.json
 
 # Copy built UI
 COPY --from=ui-build /app/ui/dist /app/ui/dist

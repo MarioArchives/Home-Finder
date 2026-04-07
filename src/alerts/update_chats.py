@@ -28,7 +28,7 @@ def _load_dotenv():
 
 _load_dotenv()
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"))
 CHATS_FILE = DATA_DIR / "chat_ids.json"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 

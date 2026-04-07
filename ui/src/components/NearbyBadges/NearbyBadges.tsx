@@ -10,7 +10,7 @@ function formatDuration(seconds: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`
 }
 
-export default function NearbyBadges({ nearby, commuteDistance, commuteDuration }: NearbyBadgesProps) {
+export default function NearbyBadges({ nearby, commuteDistance, commuteDuration, pinDistances }: NearbyBadgesProps) {
   if (!nearby) return <div className="nearby-row loading">Loading nearby places...</div>
   const climbing = nearby.closest_climbing ?? nearby.closest_amenities?.climbing
   const cinema = nearby.closest_amenities?.cinema
@@ -52,6 +52,11 @@ export default function NearbyBadges({ nearby, commuteDistance, commuteDuration 
           <span className="nearby-icon">&#128188;</span> {formatDistance(commuteDistance)}{commuteDuration != null && <span className="commute-time"> ~{formatDuration(commuteDuration)}</span>}
         </span>
       )}
+      {pinDistances?.map((pin) => (
+        <span key={pin.label} className="nearby-badge pin-badge" title={`Distance to ${pin.label}`}>
+          <span className="nearby-icon">{pin.emoji}</span> {formatDistance(pin.distance_m)}
+        </span>
+      ))}
     </div>
   )
 }

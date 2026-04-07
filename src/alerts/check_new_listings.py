@@ -23,8 +23,8 @@ from pathlib import Path
 from scrape_listings import create_browser, scrape_source
 from playwright.sync_api import sync_playwright
 from providers import get_all_provider_names
-from alert_filter import matches_alert, parse_price, SHARE_KEYWORDS
-from format_notify import load_amenities, format_alert_summary, format_listing
+from alerts.alert_filter import matches_alert, parse_price, SHARE_KEYWORDS
+from alerts.format_notify import load_amenities, format_alert_summary, format_listing
 
 # ── Scraper settings ─────────────────────────────────────────────────────────
 CITY = os.environ.get("CITY", "Manchester")
@@ -33,7 +33,7 @@ SOURCE = os.environ.get("SOURCE", "both")
 MAX_PAGES = int(os.environ.get("PAGES", "5"))
 # ─────────────────────────────────────────────────────────────────────────────
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"))
 SEEN_FILE = DATA_DIR / "seen_listings.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 CHATS_FILE = DATA_DIR / "chat_ids.json"

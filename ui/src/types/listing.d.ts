@@ -117,3 +117,11 @@ export interface Chat {
   alert_ids: string[] | null
 }
 
+export interface CustomPin {
+  id: string
+  label: string
+  emoji: string
+  lat: number
+  lng: number
+}
+

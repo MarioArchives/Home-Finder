@@ -13,12 +13,16 @@ ui/dist/
 .env.docker
 
 # Personal data — use seed files for Docker, these are local-only
-alerts.json
-chat_ids.json
+data/alerts.json
+data/chat_ids.json
 
 # Scraped data
-*_listings.json
-*_amenities.json
+data/*_listings.json
+data/*_amenities.json
+data/seen_listings.json
+data/config.json
+data/cron.log
+data/.env.*
 ui/public/listings.json
 ui/public/amenities.json
 
