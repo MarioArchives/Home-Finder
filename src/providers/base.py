@@ -53,86 +53,105 @@ class ListingProvider(ABC):
         """Shared scrape loop — pages through search results, parses cards,
         fetches detail pages. Providers only need to implement the abstract methods.
 
-        Every detail fetch runs in a FRESH browser context. Zoopla sits
-        behind Cloudflare, which fingerprints a context after a single
-        detail-page request and challenges everything that follows from
-        the same context. Throwing away the context after each detail
-        fetch gives each request a clean session, so CF treats them as
-        independent visitors. A context is cheap (≈20–30ms to create and
-        close), so the overhead is roughly 1s per 30 listings.
+        Both listings pages AND detail pages run in FRESH browser contexts.
+        Zoopla sits behind Cloudflare, which fingerprints a context after a
+        single request and challenges everything that follows from the same
+        context — this applies to search results (`?pn=2` onwards) just as
+        much as to detail pages. Throwing away the context after each request
+        gives every hit a clean session, so CF treats them as independent
+        visitors. A context is cheap (≈20–30ms to create and close), so the
+        overhead is roughly 1s per 30 listings.
+
+        The initial `context` passed in is used only for `resolve_location`
+        (which some providers need for multi-step interactions that set
+        state), and then discarded.
         """
         # Late import to avoid a cycle (base <- providers <- scrape_listings).
         from scrape_listings import create_context
 
         browser = context.browser
-        page = context.new_page()
         listings = []
         seen_urls = set()
-        cookies_accepted = False
 
+        # Resolve location on the provided (non-fresh) context. For providers
+        # that need it (Rightmove), this is a multi-step interaction; for
+        # Zoopla it's a no-op.
+        resolve_page = context.new_page()
         try:
-            # Resolve location if the provider needs it
-            location_id = self.resolve_location(page, city)
-            if location_id is False:
-                # Provider explicitly failed to resolve
-                print(f"[{self.name}] Could not resolve location for '{city}'. Skipping.")
-                return []
+            location_id = self.resolve_location(resolve_page, city)
+        finally:
+            resolve_page.close()
+        if location_id is False:
+            print(f"[{self.name}] Could not resolve location for '{city}'. Skipping.")
+            return []
 
-            for pg in range(1, max_pages + 1):
-                url = self.build_search_url(city, listing_type, pg, location_id)
+        for pg in range(1, max_pages + 1):
+            url = self.build_search_url(city, listing_type, pg, location_id)
+            print(f"[{self.name}] Fetching page {pg}...")
 
-                print(f"[{self.name}] Fetching page {pg}...")
+            # Fresh context for this listings page.
+            list_ctx = create_context(browser)
+            try:
+                page = list_ctx.new_page()
                 page.goto(url, wait_until="domcontentloaded")
                 page.wait_for_timeout(3000)
+                self.accept_cookies(page)
+                page.wait_for_timeout(1000)
 
-                if not cookies_accepted:
-                    self.accept_cookies(page)
-                    page.wait_for_timeout(1000)
-                    cookies_accepted = True
+                html = page.content()
+                if "Just a moment" in html and "cf-" in html.lower():
+                    # Give the challenge a few seconds to auto-resolve.
+                    for _ in range(3):
+                        page.wait_for_timeout(1000)
+                        html = page.content()
+                        if "Just a moment" not in html:
+                            break
+                    else:
+                        print(f"[{self.name}] Page {pg} blocked by Cloudflare. Stopping pagination.")
+                        break
 
-                soup = BeautifulSoup(page.content(), "html.parser")
+                soup = BeautifulSoup(html, "html.parser")
                 cards = self.get_result_cards(soup)
+            finally:
+                list_ctx.close()
 
-                if not cards:
-                    print(f"[{self.name}] No more results on page {pg}.")
-                    break
+            if not cards:
+                print(f"[{self.name}] No more results on page {pg}.")
+                break
 
-                page_listings = []
-                for card in cards:
-                    listing = self.parse_card(card, listing_type)
-                    if listing is None:
-                        continue
-                    if listing["url"] and listing["url"] in seen_urls:
-                        continue
-                    if listing["url"]:
-                        seen_urls.add(listing["url"])
-                    page_listings.append(listing)
+            page_listings = []
+            for card in cards:
+                listing = self.parse_card(card, listing_type)
+                if listing is None:
+                    continue
+                if listing["url"] and listing["url"] in seen_urls:
+                    continue
+                if listing["url"]:
+                    seen_urls.add(listing["url"])
+                page_listings.append(listing)
 
-                # Fetch detail pages for extra info — fresh context each time.
-                for i, listing in enumerate(page_listings):
-                    if not listing["url"]:
-                        continue
-                    print(
-                        f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
-                        end="",
-                        flush=True,
-                    )
-                    detail_ctx = create_context(browser)
-                    try:
-                        dp = detail_ctx.new_page()
-                        extras = self.scrape_detail(dp, listing["url"])
-                        listing.update(extras)
-                    finally:
-                        detail_ctx.close()
-                    print(" done")
-                    time.sleep(0.5)
+            # Fetch detail pages for extra info — fresh context each time.
+            for i, listing in enumerate(page_listings):
+                if not listing["url"]:
+                    continue
+                print(
+                    f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
+                    end="",
+                    flush=True,
+                )
+                detail_ctx = create_context(browser)
+                try:
+                    dp = detail_ctx.new_page()
+                    extras = self.scrape_detail(dp, listing["url"])
+                    listing.update(extras)
+                finally:
+                    detail_ctx.close()
+                print(" done")
+                time.sleep(0.5)
 
-                listings.extend(page_listings)
-                print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
-                time.sleep(1)
-
-        finally:
-            page.close()
+            listings.extend(page_listings)
+            print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
+            time.sleep(1)
 
         print(f"[{self.name}] Collected {len(listings)} listings total.")
         return listings
