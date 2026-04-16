@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from server_lib.config import load_telegram_env
-from server_lib.routes_setup import handle_status, handle_setup_post, handle_setup_progress
+from server_lib.routes_setup import handle_status, handle_setup_post, handle_setup_progress, handle_setup_preferences
 from server_lib.routes_alerts import (
     handle_alerts_get, handle_alerts_post, handle_alert_test,
     handle_alert_put, handle_alert_delete,
@@ -65,6 +65,11 @@ class AppHandler(SimpleHTTPRequestHandler):
             body = self._read_json_body()
             if body is None: return
             handle_alerts_post(self, body)
+
+        elif self.path == "/api/setup/preferences":
+            body = self._read_json_body()
+            if body is None: return
+            handle_setup_preferences(self, body)
 
         elif self.path == "/api/telegram/setup":
             body = self._read_json_body()

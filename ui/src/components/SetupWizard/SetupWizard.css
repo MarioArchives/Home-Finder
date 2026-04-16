@@ -110,42 +110,6 @@
     }
 }
 
-/* ===== Amenity selection ===== */
-.setup-amenities {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.setup-amenity-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-    color: var(--text);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-}
-
-.setup-amenity-option:hover {
-    background: var(--bg);
-}
-
-.setup-amenity-option input[type="checkbox"] {
-    accent-color: var(--accent);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.setup-amenity-option .amenity-icon {
-    font-size: 16px;
-}
-
 .setup-submit {
     width: 100%;
     padding: 12px;
@@ -168,39 +132,3 @@
     cursor: not-allowed;
 }
 
-/* ===== Location pin section ===== */
-.setup-pin-toggle {
-    margin-top: 8px;
-}
-
-.setup-pin-section {
-    margin-top: 12px;
-}
-
-.setup-pin-inputs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.setup-pin-emoji {
-    width: 60px !important;
-    text-align: center;
-    font-size: 18px !important;
-}
-
-.setup-pin-label {
-    flex: 1;
-}
-
-.setup-pin-coords {
-    font-size: 12px;
-    color: var(--text-light);
-    margin-bottom: 8px;
-}
-
-.setup-pin-section .pin-picker-map {
-    height: 250px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-}

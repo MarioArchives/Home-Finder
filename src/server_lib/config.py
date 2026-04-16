@@ -49,11 +49,22 @@ setup_state = {
     "progress": {},      # current progress details
     "error": None,       # error message if failed
 }
+setup_preferences = {
+    "amenities": "climbing",   # comma-separated selected amenities
+    "pin_data": None,          # {lat, lng, label, emoji} or None
+    "submitted": False,        # True once user confirms preferences
+}
 setup_lock = threading.Lock()
 
 
 def load_telegram_env():
-    """Load saved Telegram credentials from data volume."""
+    """Load saved Telegram credentials from data volume.
+
+    Populates both os.environ and the module-level TELEGRAM_* globals so that
+    route handlers which read them via `cfg.TELEGRAM_BOT_TOKEN` see the values
+    after a container restart (they were captured at import time as "").
+    """
+    global TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
     tg_env = DATA_DIR / ".env.telegram"
     if not tg_env.exists():
         return
@@ -63,7 +74,15 @@ def load_telegram_env():
             continue
         if "=" in line:
             key, _, value = line.partition("=")
-            os.environ[key.strip()] = value.strip()
+            key = key.strip()
+            value = value.strip()
+            if not value:
+                continue
+            os.environ[key] = value
+            if key == "TELEGRAM_BOT_TOKEN":
+                TELEGRAM_BOT_TOKEN = value
+            elif key == "TELEGRAM_CHAT_ID":
+                TELEGRAM_CHAT_ID = value
 
 
 def get_config():

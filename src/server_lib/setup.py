@@ -5,10 +5,11 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .config import (
-    DATA_DIR, CONFIG_FILE, setup_state, setup_lock, ui_dir,
+    DATA_DIR, CONFIG_FILE, setup_state, setup_preferences, setup_lock, ui_dir,
     get_listings_file, get_amenities_file,
 )
 
@@ -58,7 +59,7 @@ def parse_amenities_line(line):
         setup_state["progress"]["message"] = line
 
 
-def run_setup(city, listing_type, source, pages, amenities="climbing", pin_data=None):
+def run_setup(city, listing_type, source, pages):
     """Run the scraper and amenities fetch in a background thread."""
     listings_file = get_listings_file(city, listing_type)
     amenities_file = get_amenities_file(city, listing_type)
@@ -103,6 +104,26 @@ def run_setup(city, listing_type, source, pages, amenities="climbing", pin_data=
                 setup_state["phase"] = "error"
                 setup_state["error"] = f"Scraping failed (exit code {proc.returncode}). Last output:\n{tail}"
             return
+
+        # Wait for user preferences before running amenities
+        with setup_lock:
+            setup_state["progress"]["awaiting_preferences"] = True
+            setup_state["progress"]["message"] = "Scraping complete — waiting for your preferences..."
+
+        deadline = time.time() + 600  # 10 minute timeout
+        amenities = "climbing"
+        pin_data = None
+        while time.time() < deadline:
+            with setup_lock:
+                if setup_preferences["submitted"]:
+                    amenities = setup_preferences["amenities"]
+                    pin_data = setup_preferences["pin_data"]
+                    break
+            time.sleep(2)
+        else:
+            with setup_lock:
+                amenities = setup_preferences["amenities"]
+                pin_data = setup_preferences["pin_data"]
 
         # Run amenities fetch
         with setup_lock:

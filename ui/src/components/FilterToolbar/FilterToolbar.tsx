@@ -33,7 +33,7 @@ function hasActiveExtraFilters(filters: FilterState): boolean {
 }
 
 const INITIAL_FILTERS: FilterState = {
-    search: '', minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
+    minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
     bathrooms: '', propertyType: '', propertyTypes: [], source: '',
     furnishType: '', councilTax: '', minSqFt: '', maxSqFt: '',
     availableFrom: '', availableTo: '', excludeShares: false,
@@ -41,7 +41,7 @@ const INITIAL_FILTERS: FilterState = {
 }
 
 export default function FilterToolbar({
-    filters, setFilters, options, showMoreFilters, setShowMoreFilters, onSearchChange, onShowPinPopup,
+    filters, setFilters, options, showMoreFilters, setShowMoreFilters, onShowPinPopup,
 }: FilterToolbarProps) {
     const updateFilter = (key: keyof FilterState, value: string) =>
         setFilters((prev) => ({ ...prev, [key]: value }))
@@ -55,10 +55,6 @@ export default function FilterToolbar({
         <>
             <div className="filters">
                 <div className="filter-row primary-filters">
-                    <div className="filter-group search">
-                        <label>Search</label>
-                        <input type="text" placeholder="Address, description, agent..." value={filters.search} onChange={(e) => onSearchChange(e.target.value)} />
-                    </div>
                     <div className="filter-group">
                         <label>Min price</label>
                         <input type="number" placeholder="e.g. 800" value={filters.minPrice} onChange={(e) => updateFilter('minPrice', e.target.value)} />

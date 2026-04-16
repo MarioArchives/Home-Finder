@@ -4,7 +4,7 @@ import json
 import threading
 import time
 
-from .config import setup_state, setup_lock, get_status, get_config
+from .config import setup_state, setup_preferences, setup_lock, get_status, get_config
 from .setup import run_setup
 from .data_store import load_chats
 
@@ -36,11 +36,6 @@ def handle_setup_post(handler, body):
     listing_type = body.get("type", "rent")
     source = body.get("source", "rightmove")
     pages = int(body.get("pages", 5))
-    amenities = body.get("amenities", "climbing")
-    pin_lat = body.get("pin_lat")
-    pin_lng = body.get("pin_lng")
-    pin_label = body.get("pin_label", "")
-    pin_emoji = body.get("pin_emoji", "\U0001f4cd")
 
     if not city:
         handler._json_response(400, {"error": "City is required"})
@@ -52,17 +47,35 @@ def handle_setup_post(handler, body):
         handler._json_response(400, {"error": "Source must be 'rightmove', 'zoopla', or 'both'"})
         return
 
-    pin_data = None
-    if pin_lat is not None and pin_lng is not None and pin_label:
-        pin_data = {"lat": float(pin_lat), "lng": float(pin_lng), "label": pin_label, "emoji": pin_emoji}
+    with setup_lock:
+        setup_preferences["amenities"] = "climbing"
+        setup_preferences["pin_data"] = None
+        setup_preferences["submitted"] = False
 
     thread = threading.Thread(
         target=run_setup,
-        args=(city, listing_type, source, pages, amenities, pin_data),
+        args=(city, listing_type, source, pages),
         daemon=True,
     )
     thread.start()
     handler._json_response(201, {"ok": True})
+
+
+def handle_setup_preferences(handler, body):
+    with setup_lock:
+        if setup_state["phase"] not in ("scraping", "amenities"):
+            handler._json_response(409, {"error": "No setup in progress"})
+            return
+
+    amenities = body.get("amenities", "climbing")
+    pin_data = body.get("pin_data")
+
+    with setup_lock:
+        setup_preferences["amenities"] = amenities
+        setup_preferences["pin_data"] = pin_data
+        setup_preferences["submitted"] = True
+
+    handler._json_response(200, {"ok": True})
 
 
 def handle_setup_progress(handler):
@@ -79,6 +92,7 @@ def handle_setup_progress(handler):
                 snapshot = {
                     "phase": setup_state["phase"],
                     "error": setup_state.get("error"),
+                    "preferences_submitted": setup_preferences["submitted"],
                     **setup_state["progress"],
                 }
             current = json.dumps(snapshot)

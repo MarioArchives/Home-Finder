@@ -16,6 +16,10 @@
     text-align: center;
 }
 
+.progress-card.with-preferences {
+    max-width: 600px;
+}
+
 .progress-card h1 {
     font-size: 22px;
     font-weight: 700;
@@ -192,4 +196,323 @@
 
 .progress-retry:hover {
     opacity: 0.9;
+}
+
+/* ===== Preferences panel (shown during scraping) ===== */
+.progress-preferences {
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+    padding-top: 24px;
+    text-align: left;
+}
+
+.progress-preferences h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-h);
+    margin-bottom: 16px;
+}
+
+.preferences-saved {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--green, #10b981);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 16px 0 0;
+}
+
+.preferences-saved::before {
+    content: '\2713';
+    font-size: 16px;
+}
+
+/* Pulse animation for save button when scraping is done */
+.setup-submit.pulse {
+    animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+}
+
+/* ===== Amenity selection (moved from SetupWizard) ===== */
+.progress-preferences .setup-field {
+    margin-bottom: 20px;
+}
+
+.progress-preferences .setup-field > label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-h);
+    margin-bottom: 6px;
+}
+
+.progress-preferences .setup-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+
+.setup-amenities {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.setup-amenity-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.setup-amenity-option:hover {
+    background: var(--bg);
+}
+
+.setup-amenity-option input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.setup-amenity-option .amenity-icon {
+    font-size: 16px;
+}
+
+/* ===== Location pin section ===== */
+.setup-pin-toggle {
+    margin-top: 8px;
+}
+
+.setup-pin-section {
+    margin-top: 12px;
+}
+
+.setup-pin-inputs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.setup-pin-emoji-btn {
+    width: 48px;
+    height: 42px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.setup-pin-emoji-btn:hover {
+    border-color: var(--accent);
+}
+
+.setup-pin-label {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.setup-pin-label:focus {
+    border-color: var(--accent);
+}
+
+.setup-pin-coords {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+}
+
+.setup-pin-section .pin-picker-map {
+    height: 250px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+/* Submit button (reused from SetupWizard style) */
+.progress-preferences .setup-submit {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.progress-preferences .setup-submit:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.progress-preferences .setup-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===== Telegram bot section ===== */
+.setup-telegram-section {
+    margin-top: 12px;
+}
+
+.telegram-steps {
+    font-size: 12px;
+    color: var(--text-light);
+    padding-left: 20px;
+    margin: 0 0 10px;
+    line-height: 1.8;
+}
+
+.telegram-steps code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.setup-telegram-inputs {
+    display: flex;
+    gap: 8px;
+}
+
+.setup-telegram-token {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.setup-telegram-token:focus {
+    border-color: var(--accent);
+}
+
+.setup-telegram-connect {
+    padding: 9px 16px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.setup-telegram-connect:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+}
+
+.setup-telegram-connect:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.setup-telegram-error {
+    font-size: 12px;
+    color: #ef4444;
+    margin-top: 6px;
+}
+
+.telegram-connected {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green, #10b981);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 0;
+}
+
+.telegram-connected::before {
+    content: '\2713';
+}
+
+.setup-telegram-chats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.setup-telegram-chat-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.setup-telegram-chat-option:hover {
+    border-color: var(--accent);
+}
+
+.setup-telegram-chat-option.selected {
+    border-color: var(--accent);
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.setup-telegram-chat-option .chat-type {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: capitalize;
+}
+
+.setup-telegram-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+.setup-telegram-divider::before,
+.setup-telegram-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
 }

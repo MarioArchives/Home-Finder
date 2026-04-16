@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { PinPickerInner } from '../PinPicker/PinPicker'
+import EmojiSelection from './EmojiSelection'
 import type { CustomPinsBarProps } from './properties'
 
 export default function CustomPinsBar({ customPins, setCustomPins }: CustomPinsBarProps) {
     const [showAddPopup, setShowAddPopup] = useState(false)
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
     const [pendingEmoji, setPendingEmoji] = useState('📍')
     const [pendingLabel, setPendingLabel] = useState('')
 
@@ -48,7 +50,7 @@ export default function CustomPinsBar({ customPins, setCustomPins }: CustomPinsB
                         <div className="add-pin-fields">
                             <div className="add-pin-field">
                                 <label>Emoji</label>
-                                <input type="text" value={pendingEmoji} onChange={(e) => setPendingEmoji(e.target.value)} className="add-pin-emoji-input" maxLength={4} />
+                                <button type="button" className="add-pin-emoji-input" onClick={() => setShowEmojiPicker(true)}>{pendingEmoji}</button>
                             </div>
                             <div className="add-pin-field add-pin-field-grow">
                                 <label>Label</label>
@@ -59,6 +61,13 @@ export default function CustomPinsBar({ customPins, setCustomPins }: CustomPinsB
                         <PinPickerInner onConfirm={handleConfirm} />
                     </div>
                 </div>
+            )}
+
+            {showEmojiPicker && (
+                <EmojiSelection
+                    onSelect={(emoji) => setPendingEmoji(emoji)}
+                    onClose={() => setShowEmojiPicker(false)}
+                />
             )}
         </>
     )

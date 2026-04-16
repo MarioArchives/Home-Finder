@@ -83,7 +83,7 @@ export default function App() {
     // ---- Early returns ----
     if (ld.appStatus === 'loading') return <div className="load-screen"><p>Loading...</p></div>
     if (ld.appStatus === 'setup_needed') return <SetupWizard onStarted={() => ld.setAppStatus('scraping')} />
-    if (ld.appStatus === 'scraping' || ld.appStatus === 'amenities') return <SetupProgress onComplete={() => ld.setAppStatus('ready')} />
+    if (ld.appStatus === 'scraping' || ld.appStatus === 'amenities') return <SetupProgress onComplete={() => ld.setAppStatus('ready')} onTelegramConfigured={() => ld.setTelegramConfigured(true)} />
     if (!ld.data) return (
         <div className="load-screen">
             <h2>Property Listings Viewer</h2>
