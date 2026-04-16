@@ -1,6 +1,6 @@
 # Property Listings Viewer
 
-A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings, enriches them with nearby amenities, and serves a feature-rich UI with advanced filtering, analytics, and mapping.
+A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings from Rightmove and/or Zoopla, merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
 
 ## Quick Start (Docker)
 
@@ -8,47 +8,71 @@ A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's l
 # Build
 docker build -t property-viewer .
 
-# Run for Manchester rentals (default)
-docker run -p 8080:8080 property-viewer
-
-# Run for a different city
-docker run -p 8080:8080 -e CITY="London" -e LISTING_TYPE="rent" -e PAGES=10 property-viewer
-
-# With Telegram notifications for alerts
-docker run -p 8080:8080 \
-  -e TELEGRAM_BOT_TOKEN="your-bot-token" \
-  -e TELEGRAM_CHAT_ID="your-chat-id" \
-  -v property-data:/app/data \
-  property-viewer
+# Run (recommended: mount a volume so your data persists across rebuilds)
+docker run -p 8080:8080 -v property-data:/app/data property-viewer
 ```
 
-On startup the container:
-1. Scrapes listings for the configured city
-2. Fetches nearby amenities (bars, cafes, shops, climbing gyms)
-3. Serves the UI at `http://localhost:8080`
+Then open **http://localhost:8080** — a **guided setup wizard** takes over from there.
 
-## Environment Variables
+### First run — the setup wizard
 
-| Variable | Default | Description |
-|---|---|---|
-| `CITY` | `Manchester` | City to scrape |
-| `LISTING_TYPE` | `rent` | `rent` or `buy` |
-| `PAGES` | `42` | Max pages to scrape per source |
-| `SOURCE` | `rightmove` | `rightmove`, `zoopla`, or `both` |
-| `TELEGRAM_BOT_TOKEN` | | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | | Your Telegram chat ID |
+On first launch the UI walks you through:
 
-## Alerts
+1. **Search settings** — city, rent/buy, which site(s) to scrape (Rightmove, Zoopla, or both), and pages per source.
+2. **Scraping progress** — a live view of per-source pages and listings as the scraper works. When you pick both sources, they scrape in parallel.
+3. **Amenity preferences** — which optional nearby amenities to look up (climbing gyms, cinemas, gyms, parks), and an optional location pin to track commute distance per property.
+4. **Connect Telegram** (optional) — a dedicated step to hook up a Telegram bot for new-listing alerts. Has a **Skip for now** button; you can configure it later from the UI.
 
-The UI has an **Alerts** tab where you can define search criteria (max price, min bedrooms, council tax bands, property types, etc.). The app checks for new listings matching your alerts once per day at a random time and sends matches to Telegram.
+All of this is persisted to `/app/data` so subsequent container starts skip the wizard and go straight to the property browser.
+
+### Subsequent runs
+
+The container starts fast and:
+
+- symlinks your existing listings and amenities data into the served UI,
+- runs a **catch-up** if any scheduled job (scrape / alerts / amenities) was missed while the container was off,
+- starts the cron daemon for the ongoing daily/weekly schedule (see below).
+
+## How it works
+
+1. **Scrape** — Playwright + Chromium scrapes Rightmove and/or Zoopla. When both are selected they run concurrently, roughly halving wall-clock time. Zoopla's Cloudflare challenges detail pages after a search session, so each detail page is fetched in a fresh browser context to slip past the fingerprint check.
+2. **Dedup** — the same property often appears on both sites. A composite key of `(normalised description, bedrooms, monthly price)` merges duplicates; the richer listing wins and the companion URL is kept on an `alt_urls` field.
+3. **Enrich** — for each property with coordinates, OpenStreetMap's Overpass API returns counts of nearby bars/cafes/shops within 1km plus the closest climbing gym, cinema, gym, or park.
 
 ## Scheduled Jobs
 
 | Schedule | Task |
 |---|---|
 | Daily 6am | Re-scrape all listings |
-| Daily (random time) | Check alerts for new listings |
+| Daily (random time) | Check alerts for new listings, send Telegram notifications |
 | Weekly Sunday 7am | Refresh amenities data |
+
+If the container was off when a job was due, the entrypoint runs a **catch-up** for any job whose last run is older than its normal interval.
+
+## Alerts
+
+The UI has an **Alerts** tab where you define criteria (max price, min bedrooms, council tax bands, property types, pin radius, etc.). The daily alert job sends matches to Telegram as a **photo + caption** (property image + key fields + link), falling back to plain text when an image isn't available.
+
+## Environment Variables
+
+Most users configure the app via the UI wizard. These env vars mainly pre-seed the wizard's defaults or let cron pick up settings when the container restarts.
+
+| Variable | Default | Description |
+|---|---|---|
+| `CITY` | `Manchester` | Pre-fills the wizard's city field |
+| `LISTING_TYPE` | `rent` | `rent` or `buy` |
+| `PAGES` | `1` | Max pages to scrape per source |
+| `SOURCE` | `rightmove` | `rightmove`, `zoopla`, or `both` |
+| `TELEGRAM_BOT_TOKEN` | | Can be set via the wizard instead |
+| `TELEGRAM_CHAT_ID` | | Can be set via the wizard instead |
+
+```bash
+# Example: pre-seed defaults for the wizard
+docker run -p 8080:8080 \
+  -e CITY="London" -e LISTING_TYPE="rent" -e SOURCE="both" -e PAGES=10 \
+  -v property-data:/app/data \
+  property-viewer
+```
 
 ## Running Locally (without Docker)
 
@@ -57,16 +81,18 @@ The UI has an **Alerts** tab where you can define search criteria (max price, mi
 pip install -r requirements.txt
 playwright install chromium
 
-# Scrape listings
-python scrape_listings.py --city Manchester --type rent --pages 5 --output listings.json
+# Scrape a single source
+python src/scrape_listings.py --city Manchester --type rent --source rightmove --pages 5
 
-# Fetch amenities
-python fetch_amenities.py listings.json amenities.json
+# Scrape both sources concurrently (with cross-site dedup)
+python src/scrape_listings.py --city Manchester --type rent --source both --pages 5
+
+# Fetch amenities (bars/cafes/shops always included; --amenities adds "closest X" lookups)
+python src/fetch_amenities.py manchester_rent_listings.json --amenities climbing,cinema,gym,parks
 
 # Build and serve UI
 cd ui && npm install && npm run build && cd ..
-cp listings.json amenities.json ui/dist/
-DATA_DIR=. python server.py 8080 ui/dist
+DATA_DIR=. PYTHONPATH=src python server.py 8080 ui/dist
 ```
 
 ## UI Features
@@ -75,4 +101,5 @@ DATA_DIR=. python server.py 8080 ui/dist
 - **Map view** with interactive markers
 - **Analytics** dashboard with 12+ charts (drill down to filter)
 - **Advanced filtering**: price, beds, baths, property type, furnishing, council tax, sq ft, availability dates, distance from a pin
-- **Alerts**: configurable criteria with daily Telegram notifications
+- **Alerts**: configurable criteria with daily Telegram photo notifications
+- **Custom pins**: drop multiple named locations (work, gym, family) and see distances per property
