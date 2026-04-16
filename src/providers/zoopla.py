@@ -99,101 +99,152 @@ class ZooplaProvider(ListingProvider):
         try:
             page.goto(url, wait_until="domcontentloaded")
             page.wait_for_timeout(2500)
-            soup = BeautifulSoup(page.content(), "html.parser")
-            text = soup.get_text()
+            html = page.content()
 
-            # Floor plan
-            for img in soup.select('img[src*="floorplan"], img[src*="floor-plan"], img[src*="FLOORPLAN"]'):
-                src = img.get("src", "")
-                if src:
-                    extras["floorplan_url"] = src
-                    break
-            if not extras["floorplan_url"]:
-                for a in soup.select('a[href*="floorplan"], a[href*="floor-plan"]'):
-                    href = a.get("href", "")
-                    if href:
-                        if not href.startswith("http"):
-                            href = "https://www.zoopla.co.uk" + href
-                        extras["floorplan_url"] = href
+            # Zoopla is behind Cloudflare and intermittently serves a
+            # "Just a moment..." JS challenge on detail URLs, which leaves a
+            # ~30KB stub that contains none of the listing data. When detected,
+            # give the challenge ~3s to auto-resolve, then bail out rather than
+            # wasting the per-listing budget on something we can't bypass.
+            if "Just a moment" in html and "cf-" in html.lower():
+                for _ in range(3):
+                    page.wait_for_timeout(1000)
+                    html = page.content()
+                    if "Just a moment" not in html:
                         break
-            if not extras["floorplan_url"]:
-                for script in soup.select("script"):
-                    if script.string and "floorplan" in (script.string or "").lower():
-                        fp = re.search(r'"floorplan[^"]*"\s*:\s*"(https?://[^"]+)"', script.string, re.IGNORECASE)
-                        if fp:
-                            extras["floorplan_url"] = fp.group(1)
-                            break
+                else:
+                    # Still challenged — nothing useful to extract.
+                    return extras
 
-            # Council tax band
-            ct = re.search(r"Council tax band\s+([A-H])\b", text, re.IGNORECASE)
+            # Zoopla ships the listing data inside Next.js streaming RSC script
+            # payloads (e.g. `self.__next_f.push([1,"...\"latitude\":53.4..."])`).
+            # soup.get_text() strips all that, so we search the raw HTML with
+            # regexes that tolerate both `"key"` and `\"key\"` (JSON-in-JS).
+
+            # Match a JSON key whether or not its quotes are backslash-escaped.
+            def _k(key: str) -> str:
+                return rf'\\?"{re.escape(key)}\\?"'
+
+            def _v_str(key: str) -> str:
+                return _k(key) + r'\s*:\s*\\?"([^"\\]+)\\?"'
+
+            # Coordinates — require lat and lng together to avoid matching
+            # unrelated latitude fields (agent offices, etc).
+            coords = re.search(
+                _k("latitude") + r"\s*:\s*([\d.-]+)\s*,\s*"
+                + _k("longitude") + r"\s*:\s*([\d.-]+)",
+                html,
+            )
+            if coords:
+                try:
+                    extras["latitude"] = float(coords.group(1))
+                    extras["longitude"] = float(coords.group(2))
+                except ValueError:
+                    pass
+
+            # EPC — only trust if the page declares hasEpc:true.
+            if re.search(_k("hasEpc") + r"\s*:\s*true", html):
+                epc = re.search(_k("efficiencyRating") + r'\s*:\s*\\?"([A-G])\\?"', html)
+                if epc:
+                    extras["epc_rating"] = epc.group(1).upper()
+
+            # Council tax band (lives in a "features" tile)
+            ct = re.search(
+                r'Council tax band\\?"\s*,\s*\\?"value\\?"\s*:\s*\\?"([A-H])\\?"',
+                html,
+            )
             if ct:
                 extras["council_tax"] = f"Band {ct.group(1).upper()}"
 
-            # EPC
-            epc = re.search(r"EPC [Rr]ating:?\s*([A-G])", text)
-            if epc:
-                extras["epc_rating"] = epc.group(1).upper()
-
-            # Size
-            sz = re.search(r"([\d,]+)\s*sq\.?\s*ft", text, re.IGNORECASE)
-            if sz:
-                extras["size_sq_ft"] = sz.group(1).replace(",", "") + " sq ft"
-
-            # Coordinates from scripts
-            for script in soup.select("script"):
-                if script.string and "latitude" in (script.string or ""):
-                    lat = re.search(r'"latitude"\s*:\s*([\d.-]+)', script.string)
-                    lng = re.search(r'"longitude"\s*:\s*([\d.-]+)', script.string)
-                    if lat and lng:
-                        extras["latitude"] = float(lat.group(1))
-                        extras["longitude"] = float(lng.group(1))
-                        break
-
-            # Key features
-            features_section = soup.select_one('[data-testid="keyFeatures"], [class*="keyFeature"]')
-            if features_section:
-                extras["key_features"] = [
-                    li.get_text(strip=True) for li in features_section.select("li")
-                ]
-
             # Furnishing
-            ft = re.search(r"(Furnished|Unfurnished|Part furnished)", text, re.IGNORECASE)
-            if ft:
-                extras["furnish_type"] = ft.group(1).strip()
+            fs = re.search(_v_str("furnishedState"), html)
+            if fs:
+                extras["furnish_type"] = fs.group(1).strip()
 
-            # Available from
-            avail = re.search(r"Available\s+(immediately|from\s+.+?)(?=\.|Part|Furnished|Unfurnished|$)", text, re.IGNORECASE)
-            if avail:
-                extras["available_from"] = avail.group(0).strip()
-            if not extras["available_from"]:
-                avail2 = re.search(r"\*?available\s+(\d{1,2}(?:st|nd|rd|th)?\s+\w+(?:\s+\d{4})?)\*?", text, re.IGNORECASE)
-                if avail2:
-                    extras["available_from"] = avail2.group(1).strip()
-
-            # Deposit
-            dep = re.search(r"Deposit\s*£([\d,]+)", text)
+            # Deposit — another "features" tile
+            dep = re.search(
+                r'Deposit\\?"\s*,\s*\\?"value\\?"\s*:\s*\\?"([^"\\]+)',
+                html,
+            )
             if dep:
-                extras["deposit"] = f"£{dep.group(1)}"
+                extras["deposit"] = dep.group(1).strip()
 
-            # Letting arrangements / min tenancy
-            la = re.search(r"Letting arrangements\s*(.+?)(?=Electric|EPC|Utilities|Report|$)", text)
+            # Minimum tenancy — lives under "Letting arrangements" tile
+            la = re.search(
+                r'Letting arrangements\\?"\s*,\s*\\?"value\\?"\s*:\s*\\?"([^"\\]+)',
+                html,
+            )
             if la:
                 val = la.group(1).strip()
-                if "ask" not in val.lower():
+                if val and "ask" not in val.lower():
                     extras["min_tenancy"] = val
 
-            # Images
-            image_urls = set()
-            for el in soup.select("source, img"):
-                for attr in ["srcset", "src"]:
-                    val = el.get(attr, "")
-                    if "zoocdn" in val and "agent_logo" not in val:
-                        for part in val.split(","):
-                            img_url = part.strip().split(" ")[0]
-                            if img_url and not img_url.endswith(":p") and "/1024/" in img_url:
-                                image_urls.add(img_url)
-            if image_urls:
-                extras["images"] = sorted(image_urls)
+            # Available from — try structured key first, then free text.
+            af = re.search(_v_str("availableFromDate"), html)
+            if af:
+                extras["available_from"] = af.group(1).strip()
+            else:
+                af2 = re.search(
+                    r"Available\s+(immediately|from\s+[\w\s,]{3,60}?)(?=[\\\"<.])",
+                    html,
+                    re.IGNORECASE,
+                )
+                if af2:
+                    extras["available_from"] = af2.group(0).strip()
+
+            # Size — any "N sq ft" in the raw HTML; bound to plausible range.
+            sz = re.search(r"(\d[\d,]*)\s*sq\.?\s*ft", html, re.IGNORECASE)
+            if sz:
+                try:
+                    val = int(sz.group(1).replace(",", ""))
+                    if 50 <= val <= 10000:
+                        extras["size_sq_ft"] = f"{val} sq ft"
+                except ValueError:
+                    pass
+
+            # Floor plan — only if the page declares one exists.
+            if re.search(_k("hasFloorplan") + r"\s*:\s*true", html):
+                fp = re.search(
+                    r"(https?://[^\s\"\\<>]*floor[^\s\"\\<>]*)",
+                    html,
+                    re.IGNORECASE,
+                )
+                if fp:
+                    extras["floorplan_url"] = fp.group(1)
+
+            # Key features — "bullets":[ "...", "..." ]
+            bm = re.search(_k("bullets") + r"\s*:\s*\[([^\]]{2,4000})\]", html)
+            if bm:
+                bullets = re.findall(r'\\?"([^"\\]{3,120})\\?"', bm.group(1))
+                # de-dupe while preserving order
+                seen = set()
+                dedup = []
+                for b in bullets:
+                    if b not in seen:
+                        seen.add(b)
+                        dedup.append(b)
+                if dedup:
+                    extras["key_features"] = dedup
+
+            # Images — Zoopla CDN URLs, prefer the largest resolution available.
+            img_urls = set(
+                re.findall(r"https://lid\.zoocdn\.com/u/\d+/\d+/[a-f0-9]+\.jpg", html)
+            )
+            if img_urls:
+                # Group by hash; keep the largest WxH per hash.
+                best: dict[str, tuple[int, str]] = {}
+                for u in img_urls:
+                    m = re.search(
+                        r"/u/(\d+)/(\d+)/([a-f0-9]+)\.jpg$", u
+                    )
+                    if not m:
+                        continue
+                    w, h, hashid = int(m.group(1)), int(m.group(2)), m.group(3)
+                    area = w * h
+                    if hashid not in best or area > best[hashid][0]:
+                        best[hashid] = (area, u)
+                if best:
+                    extras["images"] = sorted(u for _, u in best.values())
 
         except Exception as e:
             print(f"    [{self.name}] Error fetching detail: {e}")

@@ -95,6 +95,64 @@
     margin-bottom: 8px;
 }
 
+/* Per-source rows (parallel scraping) */
+.progress-source-row {
+    padding: 10px 0;
+    transition: opacity 0.3s ease;
+}
+
+.progress-source-row + .progress-source-row {
+    border-top: 1px solid var(--border);
+}
+
+.progress-source-row.completed {
+    color: var(--green);
+}
+
+.progress-source-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.progress-source-name {
+    font-weight: 600;
+    color: var(--text-h);
+}
+
+.progress-source-row.completed .progress-source-name {
+    color: var(--green);
+}
+
+.progress-source-summary {
+    font-size: 12px;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.progress-source-row.completed .progress-source-summary {
+    color: var(--green);
+    font-weight: 600;
+}
+
+.progress-source-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.progress-source-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
 .progress-stat {
     font-size: 13px;
     color: var(--text-light);
@@ -515,4 +573,22 @@
     flex: 1;
     height: 1px;
     background: var(--border);
+}
+
+.setup-telegram-skip {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.15s;
+}
+
+.setup-telegram-skip:hover {
+    color: var(--text);
 }

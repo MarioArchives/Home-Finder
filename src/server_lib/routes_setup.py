@@ -1,5 +1,6 @@
 """Route handlers for /api/setup and /api/status endpoints."""
 
+import copy
 import json
 import threading
 import time
@@ -20,7 +21,7 @@ def handle_status(handler):
     }
     if status in ("scraping", "amenities"):
         with setup_lock:
-            body["progress"] = dict(setup_state["progress"])
+            body["progress"] = copy.deepcopy(setup_state["progress"])
     elif status == "ready":
         body["config"] = get_config()
     handler._json_response(200, body)
@@ -93,7 +94,7 @@ def handle_setup_progress(handler):
                     "phase": setup_state["phase"],
                     "error": setup_state.get("error"),
                     "preferences_submitted": setup_preferences["submitted"],
-                    **setup_state["progress"],
+                    **copy.deepcopy(setup_state["progress"]),
                 }
             current = json.dumps(snapshot)
             if current != last_sent:

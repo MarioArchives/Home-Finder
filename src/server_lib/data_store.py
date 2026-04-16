@@ -46,13 +46,41 @@ def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
     return result
 
 
-def send_telegram(text: str, chat_id: str | None = None):
+# Telegram caps photo captions at 1024 chars (HTML markup included).
+_TELEGRAM_CAPTION_LIMIT = 1024
+
+
+def send_telegram(text: str, chat_id: str | None = None,
+                  photo_url: str | None = None):
+    """Send a Telegram message. If `photo_url` is set, send as a photo
+    with the text as caption (caption truncated to 1024 chars). On photo
+    failure, fall back to plain text so the alert always gets through.
+    """
     if not cfg.TELEGRAM_BOT_TOKEN:
         print(f"[Telegram] Not configured. Message:\n{text}")
         return
     if not chat_id:
         print("[Telegram] No chat ID provided, skipping.")
         return
+
+    if photo_url:
+        caption = text
+        if len(caption) > _TELEGRAM_CAPTION_LIMIT:
+            caption = caption[: _TELEGRAM_CAPTION_LIMIT - 1] + "…"
+        url = f"https://api.telegram.org/bot{cfg.TELEGRAM_BOT_TOKEN}/sendPhoto"
+        data = urllib.parse.urlencode({
+            "chat_id": chat_id,
+            "photo": photo_url,
+            "caption": caption,
+            "parse_mode": "HTML",
+        }).encode()
+        try:
+            req = urllib.request.Request(url, data=data)
+            urllib.request.urlopen(req, timeout=15)
+            return
+        except Exception as e:
+            print(f"[Telegram] sendPhoto failed for {chat_id}: {e} — falling back to text")
+
     url = f"https://api.telegram.org/bot{cfg.TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
         "chat_id": chat_id,

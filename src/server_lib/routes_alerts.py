@@ -101,8 +101,10 @@ def handle_alert_test(handler, alert_id):
             send_telegram(header, chat_id=cid)
         for listing in matches:
             msg = format_listing(listing, alert=alert, amenities=amenities)
+            images = listing.get("images") or []
+            photo = images[0] if images else None
             for cid in targets:
-                send_telegram(msg, chat_id=cid)
+                send_telegram(msg, chat_id=cid, photo_url=photo)
     else:
         for cid in targets:
             send_telegram(

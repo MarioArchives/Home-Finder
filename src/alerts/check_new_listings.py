@@ -14,14 +14,12 @@ Setup:
 
 import json
 import os
-import smtplib
 import urllib.request
 import urllib.parse
-from email.mime.text import MIMEText
 from pathlib import Path
 
-from scrape_listings import create_browser, scrape_source
-from playwright.sync_api import sync_playwright
+from scrape_listings import scrape_all
+from dedupe import dedupe
 from providers import get_all_provider_names
 from alerts.alert_filter import matches_alert, parse_price, SHARE_KEYWORDS
 from alerts.format_notify import load_amenities, format_alert_summary, format_listing
@@ -37,14 +35,8 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"
 SEEN_FILE = DATA_DIR / "seen_listings.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 CHATS_FILE = DATA_DIR / "chat_ids.json"
-NOTIFY_METHOD = os.environ.get("NOTIFY_METHOD", "telegram")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS", "")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
-EMAIL_TO = os.environ.get("EMAIL_TO", "")
 
 def load_seen() -> set[str]:
     if SEEN_FILE.exists():
@@ -92,15 +84,12 @@ def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
     return result
 
 
-def send_telegram(text: str, chat_id: str | None = None):
-    """Send a message via the Telegram Bot API to a specific chat."""
-    if not TELEGRAM_BOT_TOKEN:
-        print("[Telegram] Token not set, skipping.")
-        return
-    if not chat_id:
-        print("[Telegram] No chat ID provided, skipping.")
-        return
+# Telegram caps photo captions at 1024 chars (HTML markup included).
+_TELEGRAM_CAPTION_LIMIT = 1024
 
+
+def _send_telegram_message(text: str, chat_id: str) -> bool:
+    """Plain text send via sendMessage. Returns True on success."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
         "chat_id": chat_id,
@@ -108,54 +97,81 @@ def send_telegram(text: str, chat_id: str | None = None):
         "parse_mode": "HTML",
         "disable_web_page_preview": "true",
     }).encode()
-
     try:
         req = urllib.request.Request(url, data=data)
         urllib.request.urlopen(req, timeout=10)
+        return True
     except Exception as e:
-        print(f"[Telegram] Failed to send to {chat_id}: {e}")
+        print(f"[Telegram] sendMessage failed for {chat_id}: {e}")
+        return False
 
 
-def send_email(subject: str, body: str):
-    """Send an email via SMTP."""
-    if not EMAIL_ADDRESS or not EMAIL_PASSWORD or not EMAIL_TO:
-        print("[Email] Email settings not configured, skipping.")
+def _send_telegram_photo(photo_url: str, caption: str, chat_id: str) -> bool:
+    """Send a photo with caption via sendPhoto. Returns True on success.
+
+    Telegram fetches the photo server-side from the URL, so any image
+    accessible on the public internet (Rightmove/Zoopla CDNs included)
+    will work. Silently falls back to returning False if the photo fails
+    to load or is rejected — the caller can then resend as plain text.
+    """
+    if len(caption) > _TELEGRAM_CAPTION_LIMIT:
+        caption = caption[: _TELEGRAM_CAPTION_LIMIT - 1] + "…"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+    data = urllib.parse.urlencode({
+        "chat_id": chat_id,
+        "photo": photo_url,
+        "caption": caption,
+        "parse_mode": "HTML",
+    }).encode()
+    try:
+        req = urllib.request.Request(url, data=data)
+        urllib.request.urlopen(req, timeout=15)
+        return True
+    except Exception as e:
+        print(f"[Telegram] sendPhoto failed for {chat_id}: {e}")
+        return False
+
+
+def send_telegram(text: str, chat_id: str | None = None,
+                  photo_url: str | None = None):
+    """Send a message via the Telegram Bot API to a specific chat.
+
+    If `photo_url` is provided, attempt to send it as a photo with the
+    text as caption. On failure (e.g. unreachable image URL, oversized
+    caption after truncation), fall back to a plain text message so the
+    user still gets the alert.
+    """
+    if not TELEGRAM_BOT_TOKEN:
+        print("[Telegram] Token not set, skipping.")
+        return
+    if not chat_id:
+        print("[Telegram] No chat ID provided, skipping.")
         return
 
-    msg = MIMEText(body, "html")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = EMAIL_TO
-
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"[Email] Failed to send: {e}")
+    if photo_url:
+        if _send_telegram_photo(photo_url, text, chat_id):
+            return
+        # Photo send failed — fall through to plain text so the alert
+        # still gets through.
+    _send_telegram_message(text, chat_id)
 
 
-def notify(text: str, subject: str = "Property Alert",
-           chat_ids: list[str] | None = None):
-    """Send notification via configured method(s)."""
-    methods = NOTIFY_METHOD.lower()
-    sent = False
+def notify(text: str,
+           chat_ids: list[str] | None = None,
+           photo_url: str | None = None):
+    """Send a Telegram notification to the given chats.
 
-    if methods in ("telegram", "both"):
-        targets = chat_ids or get_chat_ids_for_alert()
-        for cid in targets:
-            send_telegram(text, chat_id=cid)
-        sent = bool(targets)
-
-    if methods in ("email", "both"):
-        send_email(subject, text)
-        sent = True
-
-    if not sent:
-        print(f"[Notify] No notification method configured, printing:")
+    `photo_url` (optional) sends the message as a photo with the text as caption.
+    """
+    targets = chat_ids or get_chat_ids_for_alert()
+    if not targets:
+        print(f"[Notify] No Telegram chats configured, printing:")
         print(text)
         print()
+        return
+
+    for cid in targets:
+        send_telegram(text, chat_id=cid, photo_url=photo_url)
 
 
 
@@ -171,24 +187,20 @@ def main():
     seen = load_seen()
     print(f"Loaded {len(seen)} previously seen listings.")
 
-    # Scrape
-    all_listings = []
-    with sync_playwright() as pw:
-        browser, context = create_browser(pw)
-        try:
-            if SOURCE in ("all", "both"):
-                sources = get_all_provider_names()
-            else:
-                sources = [s.strip() for s in SOURCE.split(",")]
-            for source_name in sources:
-                all_listings.extend(
-                    scrape_source(context, source_name, CITY, LISTING_TYPE, MAX_PAGES)
-                )
-        finally:
-            context.close()
-            browser.close()
+    # Scrape — providers run concurrently when more than one is selected.
+    if SOURCE in ("all", "both"):
+        sources = get_all_provider_names()
+    else:
+        sources = [s.strip() for s in SOURCE.split(",")]
+    all_listings = scrape_all(sources, CITY, LISTING_TYPE, MAX_PAGES)
 
     print(f"Scraped {len(all_listings)} total listings.")
+
+    # Merge cross-provider duplicates before alert matching so the same
+    # property is only evaluated (and notified) once.
+    all_listings, merged = dedupe(all_listings)
+    if merged > 0:
+        print(f"Merged {merged} duplicate listing(s).")
 
     # Find new listings
     new_listings = [l for l in all_listings if l.get("url") and l["url"] not in seen]
@@ -212,16 +224,14 @@ def main():
             pct = (len(matches) / total * 100) if total else 0
             header = format_alert_summary(alert)
             header += f"\n\n🏠 <b>{len(matches)} of {total} new listings matched ({pct:.1f}%)</b>"
-            notify(
-                header,
-                subject=f"{len(matches)} new listing(s) for \"{alert_name}\"",
-                chat_ids=targets,
-            )
+            notify(header, chat_ids=targets)
             for listing in matches:
+                images = listing.get("images") or []
+                photo = images[0] if images else None
                 notify(
                     format_listing(listing, alert=alert, amenities=amenities),
-                    subject=f"New listing: {listing.get('title', 'Property')}",
                     chat_ids=targets,
+                    photo_url=photo,
                 )
 
     # Update seen set with ALL listings (not just matches)

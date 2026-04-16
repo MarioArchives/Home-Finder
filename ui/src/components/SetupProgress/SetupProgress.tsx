@@ -3,20 +3,48 @@ import EmojiSelection from '../CustomPinsBar/EmojiSelection'
 import { PinPickerInner } from '../PinPicker/PinPicker'
 import './SetupProgress.css'
 
-interface ProgressData {
-    phase?: string
-    source?: string
+interface SourceProgress {
     current_page?: number
     total_pages?: number
     pages_done?: number
     listings_found?: number
-    detail_current?: number
-    detail_total?: number
-    current_listing?: string
+    detail_current?: number | null
+    detail_total?: number | null
+    current_listing?: string | null
+    completed?: boolean
+}
+
+interface ProgressData {
+    phase?: string
+    source?: string
+    sources?: Record<string, SourceProgress>
+    total_pages?: number
+    pages_done?: number
+    listings_found?: number
     message?: string
     error?: string | null
     awaiting_preferences?: boolean
     preferences_submitted?: boolean
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+    rightmove: 'Rightmove',
+    zoopla: 'Zoopla',
+}
+
+function sourceLabel(name: string): string {
+    return SOURCE_LABELS[name] ?? (name.charAt(0).toUpperCase() + name.slice(1))
+}
+
+function sourcePercent(s: SourceProgress): number {
+    const total = s.total_pages ?? 0
+    if (total <= 0) return 0
+    const done = s.pages_done ?? 0
+    let frac = 0
+    if (s.detail_current != null && s.detail_total != null && s.detail_total > 0) {
+        frac = s.detail_current / s.detail_total
+    }
+    return Math.min(((done + frac) / total) * 100, 100)
 }
 
 interface SetupProgressProps {
@@ -49,8 +77,11 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
     const [prefsSaved, setPrefsSaved] = useState(false)
     const [prefsSaving, setPrefsSaving] = useState(false)
 
-    // Telegram bot state
-    const [showTelegram, setShowTelegram] = useState(false)
+    // Telegram bot state — the Telegram panel is its own step that appears
+    // after amenities/preferences are saved. `telegramDismissed` flips true
+    // when the user either completes the connect flow or clicks Skip, which
+    // hides the panel for the rest of this setup run.
+    const [telegramDismissed, setTelegramDismissed] = useState(false)
     const [botToken, setBotToken] = useState('')
     const [botName, setBotName] = useState('')
     const [botConnected, setBotConnected] = useState(false)
@@ -179,6 +210,8 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
             } else {
                 setChatSaved(true)
                 onTelegramConfigured?.()
+                // Close the Telegram panel once connection is fully set up.
+                setTelegramDismissed(true)
             }
         } catch {
             setBotError('Failed to connect to server')
@@ -197,15 +230,24 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
     const isComplete = phase === 'complete'
     const awaitingPrefs = progress.awaiting_preferences && !prefsSaved
 
-    // Calculate percentage for the progress bar
+    const sourceEntries = progress.sources
+        ? Object.entries(progress.sources) as [string, SourceProgress][]
+        : []
+
+    // Calculate percentage for the overall progress bar. Sum fractional
+    // detail-page progress across all currently-running sources so that
+    // parallel scrapers contribute smoothly instead of overwriting each
+    // other's partial-page fraction.
     let percent = 0
     if (isScraping && progress.total_pages && progress.total_pages > 0) {
         const pagesDone = progress.pages_done ?? 0
-        let pageProgress = 0
-        if (progress.detail_current != null && progress.detail_total != null && progress.detail_total > 0) {
-            pageProgress = progress.detail_current / progress.detail_total
+        let detailFrac = 0
+        for (const [, s] of sourceEntries) {
+            if (!s.completed && s.detail_current != null && s.detail_total != null && s.detail_total > 0) {
+                detailFrac += s.detail_current / s.detail_total
+            }
         }
-        percent = ((pagesDone + pageProgress) / progress.total_pages) * 80
+        percent = ((pagesDone + detailFrac) / progress.total_pages) * 80
     } else if (isAmenities) {
         percent = 85
     } else if (isComplete) {
@@ -213,10 +255,13 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
     }
 
     const showPrefsPanel = isScraping && !prefsSaved
+    // Telegram is its own step that opens once preferences are saved and
+    // stays until the user connects fully or clicks Skip.
+    const showTelegramPanel = isScraping && prefsSaved && !telegramDismissed
 
     return (
         <div className="setup-progress">
-            <div className={`progress-card ${showPrefsPanel ? 'with-preferences' : ''}`}>
+            <div className={`progress-card ${showPrefsPanel || showTelegramPanel ? 'with-preferences' : ''}`}>
                 <h1>{error ? 'Setup failed' : isComplete ? 'Ready!' : 'Setting up...'}</h1>
 
                 {error ? (
@@ -243,31 +288,54 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
                             </div>
                         </div>
 
-                        {isScraping && !progress.awaiting_preferences && (
+                        {isScraping && !progress.awaiting_preferences && sourceEntries.length > 0 && (
                             <div className="progress-details">
-                                {progress.source && (
-                                    <div className="progress-source">
-                                        Source: <strong>{progress.source}</strong>
+                                {sourceEntries.map(([name, s]) => (
+                                    <div
+                                        key={name}
+                                        className={`progress-source-row ${s.completed ? 'completed' : 'active'}`}
+                                    >
+                                        <div className="progress-source-head">
+                                            <span className="progress-source-name">
+                                                {s.completed ? '\u2713 ' : ''}{sourceLabel(name)}
+                                            </span>
+                                            {s.completed ? (
+                                                <span className="progress-source-summary">
+                                                    completed{(s.listings_found ?? 0) > 0
+                                                        ? ` \u2014 ${s.listings_found} listings`
+                                                        : ''}
+                                                </span>
+                                            ) : s.total_pages != null && (s.current_page ?? 0) > 0 ? (
+                                                <span className="progress-source-summary">
+                                                    Page {s.current_page} of {s.total_pages}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        {!s.completed && (
+                                            <>
+                                                <div className="progress-source-bar">
+                                                    <div
+                                                        className="progress-source-bar-fill"
+                                                        style={{ width: `${sourcePercent(s)}%` }}
+                                                    />
+                                                </div>
+                                                {s.detail_current != null && s.detail_total != null && (
+                                                    <div className="progress-stat">
+                                                        Fetching details: {s.detail_current} / {s.detail_total}
+                                                    </div>
+                                                )}
+                                                {(s.listings_found ?? 0) > 0 && (
+                                                    <div className="progress-stat listings-count">
+                                                        {s.listings_found} listings found
+                                                    </div>
+                                                )}
+                                                {s.current_listing && (
+                                                    <div className="progress-listing">{s.current_listing}</div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
-                                )}
-                                {progress.current_page != null && progress.current_page > 0 && progress.total_pages != null && (
-                                    <div className="progress-stat">
-                                        Page {progress.current_page} of {progress.total_pages}
-                                    </div>
-                                )}
-                                {progress.detail_current != null && progress.detail_total != null && (
-                                    <div className="progress-stat">
-                                        Fetching details: {progress.detail_current} / {progress.detail_total}
-                                    </div>
-                                )}
-                                {(progress.listings_found ?? 0) > 0 && (
-                                    <div className="progress-stat listings-count">
-                                        {progress.listings_found} listings found
-                                    </div>
-                                )}
-                                {progress.current_listing && (
-                                    <div className="progress-listing">{progress.current_listing}</div>
-                                )}
+                                ))}
                             </div>
                         )}
 
@@ -359,113 +427,119 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
                                     )}
                                 </div>
 
-                                <div className="setup-field">
-                                    <label className="setup-amenity-option setup-pin-toggle">
-                                        <input
-                                            type="checkbox"
-                                            checked={showTelegram}
-                                            onChange={e => setShowTelegram(e.target.checked)}
-                                        />
-                                        <span className="amenity-icon">{'\u{1F514}'}</span> Connect Telegram bot
-                                    </label>
-                                    <span className="setup-hint">
-                                        Optionally connect a Telegram bot to receive alerts for new listings.
-                                    </span>
-                                    {showTelegram && (
-                                        <div className="setup-telegram-section">
-                                            {!botConnected ? (
-                                                <>
-                                                    <ol className="telegram-steps">
-                                                        <li>Message <strong>@BotFather</strong> on Telegram</li>
-                                                        <li>Send <code>/newbot</code> and follow the prompts</li>
-                                                        <li>Paste the token below</li>
-                                                    </ol>
-                                                    <div className="setup-telegram-inputs">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Bot token"
-                                                            value={botToken}
-                                                            onChange={e => setBotToken(e.target.value)}
-                                                            className="setup-telegram-token"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            className="setup-telegram-connect"
-                                                            onClick={connectBot}
-                                                            disabled={botSubmitting}
-                                                        >
-                                                            {botSubmitting ? 'Connecting...' : 'Connect'}
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            ) : chatSaved ? (
-                                                <div className="telegram-connected">
-                                                    Connected to <strong>@{botName}</strong> — alerts will be sent to your chat
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div className="telegram-connected">
-                                                        Connected to <strong>@{botName}</strong>
-                                                    </div>
-                                                    <p className="setup-hint" style={{ margin: '8px 0' }}>
-                                                        Now send any message to your bot on Telegram, then click discover to find your chat.
-                                                    </p>
-                                                    <button
-                                                        type="button"
-                                                        className="setup-telegram-connect"
-                                                        onClick={discoverChats}
-                                                        disabled={discovering}
-                                                        style={{ marginBottom: 8 }}
-                                                    >
-                                                        {discovering ? 'Searching...' : 'Discover chats'}
-                                                    </button>
-                                                    {discoveredChats.length > 0 && (
-                                                        <div className="setup-telegram-chats">
-                                                            {discoveredChats.map(chat => (
-                                                                <button
-                                                                    key={chat.chat_id}
-                                                                    type="button"
-                                                                    className={`setup-telegram-chat-option ${selectedChat?.chat_id === chat.chat_id ? 'selected' : ''}`}
-                                                                    onClick={() => setSelectedChat(chat)}
-                                                                >
-                                                                    <strong>{chat.name}</strong>
-                                                                    <span className="chat-type">{chat.type}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    <div className="setup-telegram-divider">
-                                                        <span>or enter chat ID manually</span>
-                                                    </div>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Chat ID"
-                                                        value={selectedChat ? selectedChat.chat_id : manualChatId}
-                                                        onChange={e => { setSelectedChat(null); setManualChatId(e.target.value) }}
-                                                        className="setup-telegram-token"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="setup-telegram-connect"
-                                                        onClick={saveChat}
-                                                        disabled={chatSaving || (!selectedChat && !manualChatId.trim())}
-                                                        style={{ marginTop: 8 }}
-                                                    >
-                                                        {chatSaving ? 'Saving...' : 'Save chat'}
-                                                    </button>
-                                                </>
-                                            )}
-                                            {botError && <div className="setup-telegram-error">{botError}</div>}
-                                        </div>
-                                    )}
-                                </div>
-
                                 <button
                                     className={`setup-submit ${awaitingPrefs ? 'pulse' : ''}`}
                                     onClick={savePreferences}
                                     disabled={prefsSaving}
                                 >
                                     {prefsSaving ? 'Saving...' : awaitingPrefs ? 'Save preferences to continue' : 'Save preferences'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Telegram panel — shown after preferences are saved, still during scraping */}
+                        {showTelegramPanel && (
+                            <div className="progress-preferences">
+                                <h2>
+                                    <span className="amenity-icon" style={{ marginRight: 8 }}>{'\u{1F514}'}</span>
+                                    Connect Telegram
+                                </h2>
+                                <p className="setup-hint" style={{ marginBottom: 16 }}>
+                                    Get alerts for new listings sent straight to Telegram. You can also set this up later from Settings.
+                                </p>
+
+                                <div className="setup-telegram-section">
+                                    {!botConnected ? (
+                                        <>
+                                            <ol className="telegram-steps">
+                                                <li>Message <strong>@BotFather</strong> on Telegram</li>
+                                                <li>Send <code>/newbot</code> and follow the prompts</li>
+                                                <li>Paste the token below</li>
+                                            </ol>
+                                            <div className="setup-telegram-inputs">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Bot token"
+                                                    value={botToken}
+                                                    onChange={e => setBotToken(e.target.value)}
+                                                    className="setup-telegram-token"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="setup-telegram-connect"
+                                                    onClick={connectBot}
+                                                    disabled={botSubmitting}
+                                                >
+                                                    {botSubmitting ? 'Connecting...' : 'Connect'}
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : chatSaved ? (
+                                        <div className="telegram-connected">
+                                            Connected to <strong>@{botName}</strong> — alerts will be sent to your chat
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="telegram-connected">
+                                                Connected to <strong>@{botName}</strong>
+                                            </div>
+                                            <p className="setup-hint" style={{ margin: '8px 0' }}>
+                                                Now send any message to your bot on Telegram, then click discover to find your chat.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                className="setup-telegram-connect"
+                                                onClick={discoverChats}
+                                                disabled={discovering}
+                                                style={{ marginBottom: 8 }}
+                                            >
+                                                {discovering ? 'Searching...' : 'Discover chats'}
+                                            </button>
+                                            {discoveredChats.length > 0 && (
+                                                <div className="setup-telegram-chats">
+                                                    {discoveredChats.map(chat => (
+                                                        <button
+                                                            key={chat.chat_id}
+                                                            type="button"
+                                                            className={`setup-telegram-chat-option ${selectedChat?.chat_id === chat.chat_id ? 'selected' : ''}`}
+                                                            onClick={() => setSelectedChat(chat)}
+                                                        >
+                                                            <strong>{chat.name}</strong>
+                                                            <span className="chat-type">{chat.type}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="setup-telegram-divider">
+                                                <span>or enter chat ID manually</span>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Chat ID"
+                                                value={selectedChat ? selectedChat.chat_id : manualChatId}
+                                                onChange={e => { setSelectedChat(null); setManualChatId(e.target.value) }}
+                                                className="setup-telegram-token"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="setup-telegram-connect"
+                                                onClick={saveChat}
+                                                disabled={chatSaving || (!selectedChat && !manualChatId.trim())}
+                                                style={{ marginTop: 8 }}
+                                            >
+                                                {chatSaving ? 'Saving...' : 'Save chat'}
+                                            </button>
+                                        </>
+                                    )}
+                                    {botError && <div className="setup-telegram-error">{botError}</div>}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="setup-telegram-skip"
+                                    onClick={() => setTelegramDismissed(true)}
+                                >
+                                    Skip for now
                                 </button>
                             </div>
                         )}

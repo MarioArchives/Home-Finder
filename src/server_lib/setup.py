@@ -14,39 +14,67 @@ from .config import (
 )
 
 
+def _recompute_aggregates(progress):
+    """Recompute top-level totals from per-source state."""
+    sources = progress.get("sources", {})
+    if not sources:
+        return
+    progress["pages_done"] = sum(s.get("pages_done", 0) for s in sources.values())
+    progress["listings_found"] = sum(s.get("listings_found", 0) for s in sources.values())
+
+
 def parse_scraper_line(line):
-    """Parse a line of scraper output into progress updates."""
+    """Parse a line of scraper output into per-source progress updates.
+
+    Providers run in parallel threads when more than one is selected, so
+    stdout lines interleave. Each regex routes by the `[name]` prefix to
+    update only that provider's sub-state — otherwise the sources would
+    overwrite each other's page/detail counters.
+    """
     line = line.strip()
     if not line:
         return
 
     with setup_lock:
-        setup_state["progress"]["message"] = line
+        progress = setup_state["progress"]
+        progress["message"] = line
+        sources = progress.get("sources")
+        if not sources:
+            return
+
+        m = re.match(r"\[(\w+)\] \[(\d+)/(\d+)\] (.+?)\.\.\.(.*)$", line)
+        if m and m.group(1) in sources:
+            s = sources[m.group(1)]
+            s["detail_current"] = int(m.group(2))
+            s["detail_total"] = int(m.group(3))
+            s["current_listing"] = m.group(4).strip()
+            return
 
         m = re.match(r"\[(\w+)\] Fetching page (\d+)\.\.\.", line)
-        if m:
-            setup_state["progress"]["source"] = m.group(1)
-            setup_state["progress"]["current_page"] = int(m.group(2))
+        if m and m.group(1) in sources:
+            sources[m.group(1)]["current_page"] = int(m.group(2))
             return
 
         m = re.match(r"\[(\w+)\] Page (\d+): (\d+) listings \(total: (\d+)\)", line)
-        if m:
-            setup_state["progress"]["listings_found"] = int(m.group(4))
-            setup_state["progress"]["pages_done"] = setup_state["progress"].get("pages_done", 0) + 1
-            setup_state["progress"]["detail_current"] = None
-            setup_state["progress"]["detail_total"] = None
-            return
-
-        m = re.match(r"\[(\d+)/(\d+)\] (.+?)\.\.\.(.*)$", line)
-        if m:
-            setup_state["progress"]["detail_current"] = int(m.group(1))
-            setup_state["progress"]["detail_total"] = int(m.group(2))
-            setup_state["progress"]["current_listing"] = m.group(3).strip()
+        if m and m.group(1) in sources:
+            s = sources[m.group(1)]
+            s["listings_found"] = int(m.group(4))
+            s["pages_done"] = s.get("pages_done", 0) + 1
+            s["detail_current"] = None
+            s["detail_total"] = None
+            s["current_listing"] = None
+            _recompute_aggregates(progress)
             return
 
         m = re.match(r"\[(\w+)\] Collected (\d+) listings total\.", line)
-        if m:
-            setup_state["progress"]["listings_found"] = int(m.group(2))
+        if m and m.group(1) in sources:
+            s = sources[m.group(1)]
+            s["listings_found"] = int(m.group(2))
+            s["completed"] = True
+            s["detail_current"] = None
+            s["detail_total"] = None
+            s["current_listing"] = None
+            _recompute_aggregates(progress)
             return
 
 
@@ -64,12 +92,26 @@ def run_setup(city, listing_type, source, pages):
     listings_file = get_listings_file(city, listing_type)
     amenities_file = get_amenities_file(city, listing_type)
 
-    total_pages = pages * (2 if source == "both" else 1)
+    source_names = ["rightmove", "zoopla"] if source == "both" else [source]
+    total_pages = pages * len(source_names)
+    sources_state = {
+        name: {
+            "current_page": 0,
+            "total_pages": pages,
+            "pages_done": 0,
+            "listings_found": 0,
+            "detail_current": None,
+            "detail_total": None,
+            "current_listing": None,
+            "completed": False,
+        }
+        for name in source_names
+    }
     with setup_lock:
         setup_state["phase"] = "scraping"
         setup_state["progress"] = {
             "source": source,
-            "current_page": 0,
+            "sources": sources_state,
             "total_pages": total_pages,
             "pages_done": 0,
             "listings_found": 0,
@@ -189,9 +231,12 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
 
     env_file = DATA_DIR / ".env.cron"
     env_vars = {k: v for k, v in os.environ.items()
-                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|NOTIFY_METHOD|SMTP_|EMAIL_|PYTHONPATH)', k)}
+                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|PYTHONPATH)', k)}
     env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages), "AMENITIES": amenities, "PYTHONPATH": "/app/src"})
-    env_file.write_text("\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n")
+    # `export` is required: cron sources this file under /bin/sh, and without
+    # export these would be shell-local (not inherited by the python subprocess
+    # that runs `-m alerts.check_new_listings`, which needs PYTHONPATH set).
+    env_file.write_text("\n".join(f"export {k}={v}" for k, v in env_vars.items()) + "\n")
 
     cron_content = f"""# Re-scrape listings daily at 6am
 0 6 * * * cd /app && . {env_file} && python3 /app/src/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1

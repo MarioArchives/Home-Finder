@@ -60,17 +60,11 @@ EXPOSE 8080
 
 ENV CITY="Manchester"
 ENV LISTING_TYPE="rent"
-ENV PAGES="42"
+ENV PAGES="1"
 ENV SOURCE="rightmove"
 ENV DATA_DIR="/app/data"
 # Notifications (optional — see .env.example)
-ENV NOTIFY_METHOD="telegram"
 ENV TELEGRAM_BOT_TOKEN=""
 ENV TELEGRAM_CHAT_ID=""
-ENV SMTP_SERVER="smtp.gmail.com"
-ENV SMTP_PORT="587"
-ENV EMAIL_ADDRESS=""
-ENV EMAIL_PASSWORD=""
-ENV EMAIL_TO=""
 
 ENTRYPOINT ["/app/entrypoint.sh"]

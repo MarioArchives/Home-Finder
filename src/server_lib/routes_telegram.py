@@ -82,13 +82,18 @@ def handle_telegram_setup(handler, body):
             chats.append({"chat_id": chat_id, "name": chat_name, "alert_ids": None})
             save_chats(chats)
 
-    # Update .env.cron
+    # Update .env.cron (lines use `export VAR=value` so cron's /bin/sh
+    # actually passes them to the Python subprocess).
     cron_env = DATA_DIR / ".env.cron"
     if cron_env.exists():
         lines = cron_env.read_text().splitlines()
-        new_lines = [l for l in lines if not l.startswith("TELEGRAM_BOT_TOKEN=") and not l.startswith("TELEGRAM_CHAT_ID=")]
-        new_lines.append(f"TELEGRAM_BOT_TOKEN={bot_token}")
-        new_lines.append(f"TELEGRAM_CHAT_ID={chat_id}")
+        new_lines = [
+            l for l in lines
+            if not l.startswith(("TELEGRAM_BOT_TOKEN=", "TELEGRAM_CHAT_ID=",
+                                 "export TELEGRAM_BOT_TOKEN=", "export TELEGRAM_CHAT_ID="))
+        ]
+        new_lines.append(f"export TELEGRAM_BOT_TOKEN={bot_token}")
+        new_lines.append(f"export TELEGRAM_CHAT_ID={chat_id}")
         cron_env.write_text("\n".join(new_lines) + "\n")
 
     handler._json_response(200, {"ok": True, "bot_name": bot_name})

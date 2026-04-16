@@ -52,9 +52,20 @@ class ListingProvider(ABC):
     def scrape(self, context, city: str, listing_type: str, max_pages: int) -> list[dict]:
         """Shared scrape loop — pages through search results, parses cards,
         fetches detail pages. Providers only need to implement the abstract methods.
+
+        Every detail fetch runs in a FRESH browser context. Zoopla sits
+        behind Cloudflare, which fingerprints a context after a single
+        detail-page request and challenges everything that follows from
+        the same context. Throwing away the context after each detail
+        fetch gives each request a clean session, so CF treats them as
+        independent visitors. A context is cheap (≈20–30ms to create and
+        close), so the overhead is roughly 1s per 30 listings.
         """
+        # Late import to avoid a cycle (base <- providers <- scrape_listings).
+        from scrape_listings import create_context
+
+        browser = context.browser
         page = context.new_page()
-        detail_pages = [context.new_page(), context.new_page()]
         listings = []
         seen_urls = set()
         cookies_accepted = False
@@ -97,27 +108,30 @@ class ListingProvider(ABC):
                         seen_urls.add(listing["url"])
                     page_listings.append(listing)
 
-                # Fetch detail pages for extra info
+                # Fetch detail pages for extra info — fresh context each time.
                 for i, listing in enumerate(page_listings):
-                    if listing["url"]:
-                        print(
-                            f"    [{i + 1}/{len(page_listings)}] {listing['address']}...",
-                            end="",
-                            flush=True,
-                        )
-                        dp = detail_pages[i % 2]
+                    if not listing["url"]:
+                        continue
+                    print(
+                        f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
+                        end="",
+                        flush=True,
+                    )
+                    detail_ctx = create_context(browser)
+                    try:
+                        dp = detail_ctx.new_page()
                         extras = self.scrape_detail(dp, listing["url"])
                         listing.update(extras)
-                        print(" done")
-                        time.sleep(0.5)
+                    finally:
+                        detail_ctx.close()
+                    print(" done")
+                    time.sleep(0.5)
 
                 listings.extend(page_listings)
                 print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
                 time.sleep(1)
 
         finally:
-            for dp in detail_pages:
-                dp.close()
             page.close()
 
         print(f"[{self.name}] Collected {len(listings)} listings total.")
