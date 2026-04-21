@@ -377,3 +377,33 @@
     color: #888;
     margin-top: 4px;
 }
+
+.discover-chats-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.btn-discover-chats {
+    padding: 6px 14px;
+    border: 1px solid var(--accent, #2563eb);
+    border-radius: 6px;
+    background: none;
+    color: var(--accent, #2563eb);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-discover-chats:hover:not(:disabled) {
+    background: var(--accent, #2563eb);
+    color: #fff;
+}
+
+.btn-discover-chats:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

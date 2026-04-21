@@ -238,7 +238,12 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
     # that runs `-m alerts.check_new_listings`, which needs PYTHONPATH set).
     env_file.write_text("\n".join(f"export {k}={v}" for k, v in env_vars.items()) + "\n")
 
-    cron_content = f"""# Re-scrape listings daily at 6am
+    cron_content = f"""# Cron runs with a minimal PATH that doesn't include /usr/local/bin
+# where python3 lives in python:3.13-slim. Without this, every job fails
+# with "python3: not found".
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Re-scrape listings daily at 6am
 0 6 * * * cd /app && . {env_file} && python3 /app/src/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
 
 # Check alerts for new listings at a random daily time ({rand_hour}:{rand_min:02d})

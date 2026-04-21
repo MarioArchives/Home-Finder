@@ -285,6 +285,45 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
         )
     }
 
+    const [discoverStatus, setDiscoverStatus] = useState('')
+    const [discovering, setDiscovering] = useState(false)
+
+    const discoverChats = async () => {
+        setDiscovering(true)
+        setDiscoverStatus('')
+        try {
+            const res = await fetch('/api/telegram/discover-chats', { method: 'POST' })
+            const data = await res.json()
+            if (!res.ok) {
+                setDiscoverStatus(data.error || 'Failed to discover chats')
+                setDiscovering(false)
+                return
+            }
+            const newChats = (data.chats || []).filter((c: { already_registered?: boolean }) => !c.already_registered)
+            // Auto-add any new chats
+            for (const chat of newChats) {
+                await fetch('/api/telegram/add-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chat.chat_id, name: chat.name }),
+                }).catch(() => {})
+            }
+            // Refresh chat list
+            const refreshed = await fetch('/api/chats').then(r => r.json())
+            setChats(refreshed)
+            if (newChats.length > 0) {
+                setDiscoverStatus(`Added ${newChats.length} new chat(s)`)
+            } else if (data.chats?.length > 0) {
+                setDiscoverStatus('All chats already connected')
+            } else {
+                setDiscoverStatus('No chats found — message your bot on Telegram first')
+            }
+        } catch {
+            setDiscoverStatus('Failed to connect to server')
+        }
+        setDiscovering(false)
+    }
+
     if (loading) {
         return <div className="alerts-loading">Loading alerts...</div>
     }
@@ -483,25 +522,38 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                 Exclude shares
                             </label>
                         </div>
-                        {chats.length > 0 && (
-                            <div className="form-group form-group-wide">
-                                <label>Send to chats</label>
-                                <div className="band-toggles">
-                                    {chats.map(c => (
-                                        <button
-                                            key={c.chat_id}
-                                            className={`band-toggle ${selectedChatIds.length === 0 || selectedChatIds.includes(c.chat_id) ? 'active' : ''}`}
-                                            onClick={() => toggleChatId(c.chat_id)}
-                                        >
-                                            {c.name}
-                                        </button>
-                                    ))}
-                                </div>
-                                <span className="form-hint">
-                                    {selectedChatIds.length === 0 ? 'All chats selected' : `${selectedChatIds.length} of ${chats.length} selected`}
-                                </span>
+                        <div className="form-group form-group-wide">
+                            <label>Send to chats</label>
+                            {chats.length > 0 && (
+                                <>
+                                    <div className="band-toggles">
+                                        {chats.map(c => (
+                                            <button
+                                                key={c.chat_id}
+                                                className={`band-toggle ${selectedChatIds.length === 0 || selectedChatIds.includes(c.chat_id) ? 'active' : ''}`}
+                                                onClick={() => toggleChatId(c.chat_id)}
+                                            >
+                                                {c.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <span className="form-hint">
+                                        {selectedChatIds.length === 0 ? 'All chats selected' : `${selectedChatIds.length} of ${chats.length} selected`}
+                                    </span>
+                                </>
+                            )}
+                            <div className="discover-chats-row">
+                                <button
+                                    type="button"
+                                    className="btn-discover-chats"
+                                    onClick={discoverChats}
+                                    disabled={discovering}
+                                >
+                                    {discovering ? 'Searching...' : 'Discover chats'}
+                                </button>
+                                {discoverStatus && <span className="form-hint">{discoverStatus}</span>}
                             </div>
-                        )}
+                        </div>
                     </div>
                     <div className="alert-form-actions">
                         <button className="btn-save-alert" onClick={handleSave} disabled={!name.trim() || saving}>

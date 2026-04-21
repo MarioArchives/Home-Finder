@@ -196,6 +196,10 @@ def main():
 
     print(f"Scraped {len(all_listings)} total listings.")
 
+    if not all_listings:
+        print("Scrape returned nothing — skipping alert check to avoid wiping the seen file.")
+        return
+
     # Merge cross-provider duplicates before alert matching so the same
     # property is only evaluated (and notified) once.
     all_listings, merged = dedupe(all_listings)

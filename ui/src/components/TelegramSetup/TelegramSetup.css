@@ -229,6 +229,16 @@
 .telegram-chat-option .chat-id {
     font-size: 12px;
     color: var(--text-light);
+}
+
+.telegram-chat-option .chat-badge-registered {
+    font-size: 11px;
+    color: var(--green, #10b981);
+    font-weight: 500;
+}
+
+.telegram-chat-option.registered {
+    opacity: 0.75;
     font-family: monospace;
 }
 

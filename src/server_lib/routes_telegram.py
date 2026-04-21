@@ -99,6 +99,25 @@ def handle_telegram_setup(handler, body):
     handler._json_response(200, {"ok": True, "bot_name": bot_name})
 
 
+# Every Telegram Update carries a `chat` reference under ONE of these keys.
+# `my_chat_member` fires when a user clicks Start or blocks the bot — it has
+# no `message` field, so we'd miss the chat entirely without checking for it.
+_UPDATE_CHAT_SOURCES = (
+    "message", "edited_message", "channel_post", "edited_channel_post",
+    "my_chat_member", "chat_member", "callback_query",
+)
+
+
+def _chat_from_update(update: dict) -> dict | None:
+    for key in _UPDATE_CHAT_SOURCES:
+        payload = update.get(key)
+        if isinstance(payload, dict):
+            chat = payload.get("chat")
+            if isinstance(chat, dict) and chat.get("id") is not None:
+                return chat
+    return None
+
+
 def handle_discover_chats(handler):
     if not cfg.TELEGRAM_BOT_TOKEN:
         handler._json_response(400, {"error": "Bot token not configured yet"})
@@ -111,19 +130,38 @@ def handle_discover_chats(handler):
         if not data.get("ok"):
             handler._json_response(500, {"error": "Failed to fetch updates from Telegram"})
             return
-        seen = {}
+
+        # Walk every update and collect unique chats. We used to only look at
+        # `update.message`, which meant edited messages and Start-button
+        # interactions (which arrive as `my_chat_member`) silently produced
+        # zero chats — so "Discover chats" would report empty even after the
+        # user had messaged the bot.
+        seen: dict[str, dict] = {}
         for update in data.get("result", []):
-            msg = update.get("message", {})
-            chat = msg.get("chat", {})
-            cid = str(chat.get("id", ""))
-            if not cid:
+            chat = _chat_from_update(update)
+            if not chat:
                 continue
-            name = chat.get("first_name", "") or chat.get("title", "") or cid
-            seen[cid] = {"chat_id": cid, "name": name, "type": chat.get("type", "")}
+            cid = str(chat["id"])
+            name = chat.get("first_name") or chat.get("title") or chat.get("username") or cid
+            seen[cid] = {
+                "chat_id": cid,
+                "name": name,
+                "type": chat.get("type", ""),
+            }
+
+        # Mark chats that are already saved instead of silently hiding them.
+        # Previously this filter discarded already-registered chats, so a
+        # returning user who messaged the bot would see "No new chats found"
+        # forever — the chat existed in the Telegram queue but the handler
+        # suppressed it.
         existing = {c["chat_id"] for c in load_chats()}
-        discovered = [c for c in seen.values() if c["chat_id"] not in existing]
-        handler._json_response(200, {"chats": discovered})
+        chats = sorted(seen.values(), key=lambda c: c["chat_id"])
+        for c in chats:
+            c["already_registered"] = c["chat_id"] in existing
+
+        handler._json_response(200, {"chats": chats})
     except Exception as e:
+        print(f"[telegram] discover-chats failed: {type(e).__name__}: {e}", flush=True)
         handler._json_response(500, {"error": f"Failed to discover chats: {e}"})
 
 

@@ -89,68 +89,78 @@ class ListingProvider(ABC):
             url = self.build_search_url(city, listing_type, pg, location_id)
             print(f"[{self.name}] Fetching page {pg}...")
 
-            # Fresh context for this listings page.
-            list_ctx = create_context(browser)
+            # The entire page-fetch + detail-fetch block is wrapped in a
+            # try/except so a network failure (DNS, timeout, etc.) on page N
+            # keeps the listings from pages 1..N-1 instead of crashing the
+            # whole provider's scrape.
             try:
-                page = list_ctx.new_page()
-                page.goto(url, wait_until="domcontentloaded")
-                page.wait_for_timeout(3000)
-                self.accept_cookies(page)
-                page.wait_for_timeout(1000)
+                # Fresh context for this listings page.
+                list_ctx = create_context(browser)
+                try:
+                    page = list_ctx.new_page()
+                    page.goto(url, wait_until="domcontentloaded")
+                    page.wait_for_timeout(3000)
+                    self.accept_cookies(page)
+                    page.wait_for_timeout(1000)
 
-                html = page.content()
-                if "Just a moment" in html and "cf-" in html.lower():
-                    # Give the challenge a few seconds to auto-resolve.
-                    for _ in range(3):
-                        page.wait_for_timeout(1000)
-                        html = page.content()
-                        if "Just a moment" not in html:
+                    html = page.content()
+                    if "Just a moment" in html and "cf-" in html.lower():
+                        for _ in range(3):
+                            page.wait_for_timeout(1000)
+                            html = page.content()
+                            if "Just a moment" not in html:
+                                break
+                        else:
+                            print(f"[{self.name}] Page {pg} blocked by Cloudflare. Stopping pagination.")
                             break
-                    else:
-                        print(f"[{self.name}] Page {pg} blocked by Cloudflare. Stopping pagination.")
-                        break
 
-                soup = BeautifulSoup(html, "html.parser")
-                cards = self.get_result_cards(soup)
-            finally:
-                list_ctx.close()
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = self.get_result_cards(soup)
+                finally:
+                    list_ctx.close()
 
-            if not cards:
-                print(f"[{self.name}] No more results on page {pg}.")
+                if not cards:
+                    print(f"[{self.name}] No more results on page {pg}.")
+                    break
+
+                page_listings = []
+                for card in cards:
+                    listing = self.parse_card(card, listing_type)
+                    if listing is None:
+                        continue
+                    if listing["url"] and listing["url"] in seen_urls:
+                        continue
+                    if listing["url"]:
+                        seen_urls.add(listing["url"])
+                    page_listings.append(listing)
+
+                # Fetch detail pages for extra info — fresh context each time.
+                for i, listing in enumerate(page_listings):
+                    if not listing["url"]:
+                        continue
+                    print(
+                        f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
+                        end="",
+                        flush=True,
+                    )
+                    detail_ctx = create_context(browser)
+                    try:
+                        dp = detail_ctx.new_page()
+                        extras = self.scrape_detail(dp, listing["url"])
+                        listing.update(extras)
+                    finally:
+                        detail_ctx.close()
+                    print(" done")
+                    time.sleep(0.5)
+
+                listings.extend(page_listings)
+                print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
+
+            except Exception as e:
+                print(f"[{self.name}] Page {pg} failed: {type(e).__name__}: {e}")
+                print(f"[{self.name}] Keeping {len(listings)} listings from earlier pages.")
                 break
 
-            page_listings = []
-            for card in cards:
-                listing = self.parse_card(card, listing_type)
-                if listing is None:
-                    continue
-                if listing["url"] and listing["url"] in seen_urls:
-                    continue
-                if listing["url"]:
-                    seen_urls.add(listing["url"])
-                page_listings.append(listing)
-
-            # Fetch detail pages for extra info — fresh context each time.
-            for i, listing in enumerate(page_listings):
-                if not listing["url"]:
-                    continue
-                print(
-                    f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
-                    end="",
-                    flush=True,
-                )
-                detail_ctx = create_context(browser)
-                try:
-                    dp = detail_ctx.new_page()
-                    extras = self.scrape_detail(dp, listing["url"])
-                    listing.update(extras)
-                finally:
-                    detail_ctx.close()
-                print(" done")
-                time.sleep(0.5)
-
-            listings.extend(page_listings)
-            print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
             time.sleep(1)
 
         print(f"[{self.name}] Collected {len(listings)} listings total.")

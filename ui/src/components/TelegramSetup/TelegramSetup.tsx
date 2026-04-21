@@ -15,7 +15,7 @@ export default function TelegramSetup({ onComplete, onSkip }: TelegramSetupProps
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [discovering, setDiscovering] = useState(false)
-    const [discoveredChats, setDiscoveredChats] = useState<{ chat_id: string; name: string; type: string }[]>([])
+    const [discoveredChats, setDiscoveredChats] = useState<{ chat_id: string; name: string; type: string; already_registered?: boolean }[]>([])
 
     async function handleValidateToken() {
         if (!botToken.trim()) {
@@ -57,7 +57,9 @@ export default function TelegramSetup({ onComplete, onSkip }: TelegramSetupProps
             }
             setDiscoveredChats(data.chats || [])
             if (data.chats?.length === 0) {
-                setError('No new chats found. Make sure you\'ve sent a message to your bot first, then try again.')
+                setError('No chats found. Make sure you\'ve sent a message to your bot first, then try again.')
+            } else if (data.chats?.every((c: { already_registered?: boolean }) => c.already_registered)) {
+                setError('')
             }
         } catch {
             setError('Failed to connect to server')
@@ -176,11 +178,14 @@ export default function TelegramSetup({ onComplete, onSkip }: TelegramSetupProps
                                 {discoveredChats.map(chat => (
                                     <button
                                         key={chat.chat_id}
-                                        className={`telegram-chat-option ${chatId === chat.chat_id ? 'selected' : ''}`}
+                                        className={`telegram-chat-option ${chatId === chat.chat_id ? 'selected' : ''} ${chat.already_registered ? 'registered' : ''}`}
                                         onClick={() => selectDiscoveredChat(chat)}
                                     >
                                         <span className="chat-name">{chat.name}</span>
-                                        <span className="chat-id">{chat.chat_id}</span>
+                                        {chat.already_registered
+                                            ? <span className="chat-badge-registered">already connected</span>
+                                            : <span className="chat-id">{chat.chat_id}</span>
+                                        }
                                     </button>
                                 ))}
                             </div>

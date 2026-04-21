@@ -88,7 +88,7 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
     const [botSubmitting, setBotSubmitting] = useState(false)
     const [botError, setBotError] = useState('')
     const [discovering, setDiscovering] = useState(false)
-    const [discoveredChats, setDiscoveredChats] = useState<{ chat_id: string; name: string; type: string }[]>([])
+    const [discoveredChats, setDiscoveredChats] = useState<{ chat_id: string; name: string; type: string; already_registered?: boolean }[]>([])
     const [selectedChat, setSelectedChat] = useState<{ chat_id: string; name: string } | null>(null)
     const [manualChatId, setManualChatId] = useState('')
     const [chatSaved, setChatSaved] = useState(false)
@@ -182,7 +182,9 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
             } else {
                 setDiscoveredChats(data.chats || [])
                 if ((data.chats || []).length === 0) {
-                    setBotError('No new chats found. Message your bot on Telegram first, then try again.')
+                    setBotError('No chats found. Message your bot on Telegram first, then try again.')
+                } else if (data.chats?.every((c: { already_registered?: boolean }) => c.already_registered)) {
+                    setBotError('')
                 }
             }
         } catch {
@@ -501,11 +503,14 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
                                                         <button
                                                             key={chat.chat_id}
                                                             type="button"
-                                                            className={`setup-telegram-chat-option ${selectedChat?.chat_id === chat.chat_id ? 'selected' : ''}`}
+                                                            className={`setup-telegram-chat-option ${selectedChat?.chat_id === chat.chat_id ? 'selected' : ''} ${chat.already_registered ? 'registered' : ''}`}
                                                             onClick={() => setSelectedChat(chat)}
                                                         >
                                                             <strong>{chat.name}</strong>
-                                                            <span className="chat-type">{chat.type}</span>
+                                                            {chat.already_registered
+                                                                ? <span className="chat-badge-registered">already connected</span>
+                                                                : <span className="chat-type">{chat.type}</span>
+                                                            }
                                                         </button>
                                                     ))}
                                                 </div>

@@ -558,6 +558,16 @@
     text-transform: capitalize;
 }
 
+.setup-telegram-chat-option .chat-badge-registered {
+    font-size: 11px;
+    color: var(--green, #10b981);
+    font-weight: 500;
+}
+
+.setup-telegram-chat-option.registered {
+    opacity: 0.75;
+}
+
 .setup-telegram-divider {
     display: flex;
     align-items: center;
