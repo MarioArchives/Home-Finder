@@ -175,7 +175,19 @@ class RightmoveProvider(ListingProvider):
         try:
             page.goto(url, wait_until="domcontentloaded")
             page.wait_for_timeout(2500)
-            soup = BeautifulSoup(page.content(), "html.parser")
+            html = page.content()
+
+            # Rightmove keeps the URL live after an agent pulls the property,
+            # but replaces the page content with a "removed" notice. Detect
+            # and signal the base loop to drop it.
+            if (
+                "This property has been removed by the agent" in html
+                or "property has been removed" in html.lower()
+            ):
+                extras["_removed"] = True
+                return extras
+
+            soup = BeautifulSoup(html, "html.parser")
             text = soup.get_text()
 
             # Floor plan — extract from embedded JSON "floorplans" array

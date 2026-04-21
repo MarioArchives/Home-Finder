@@ -116,6 +116,19 @@ class ZooplaProvider(ListingProvider):
                     # Still challenged — nothing useful to extract.
                     return extras
 
+            # Zoopla keeps the URL live after an agent pulls the property,
+            # but the page reverts to a generic "no longer available" notice.
+            # Detect and signal the base loop to drop it.
+            lower_html = html.lower()
+            if (
+                "no longer available" in lower_html
+                or "this property has been removed" in lower_html
+                or "listing is no longer active" in lower_html
+                or "property is no longer on the market" in lower_html
+            ):
+                extras["_removed"] = True
+                return extras
+
             # Zoopla ships the listing data inside Next.js streaming RSC script
             # payloads (e.g. `self.__next_f.push([1,"...\"latitude\":53.4..."])`).
             # soup.get_text() strips all that, so we search the raw HTML with

@@ -26,6 +26,7 @@ from server_lib.routes_telegram import (
     handle_telegram_status, handle_chats_get, handle_telegram_setup,
     handle_discover_chats, handle_add_chat,
 )
+from server_lib.routes_cron import handle_cron_status
 
 from server_lib import config as cfg
 
@@ -45,6 +46,8 @@ class AppHandler(SimpleHTTPRequestHandler):
             handle_chats_get(self)
         elif self.path == "/api/telegram/status":
             handle_telegram_status(self)
+        elif self.path == "/api/cron/status":
+            handle_cron_status(self)
         else:
             # SPA fallback
             path = self.translate_path(self.path)

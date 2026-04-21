@@ -135,8 +135,12 @@ class ListingProvider(ABC):
                     page_listings.append(listing)
 
                 # Fetch detail pages for extra info — fresh context each time.
+                # Removed listings (detected inside scrape_detail) are dropped
+                # so they don't carry over between scrapes.
+                kept_listings = []
                 for i, listing in enumerate(page_listings):
                     if not listing["url"]:
+                        kept_listings.append(listing)
                         continue
                     print(
                         f"[{self.name}] [{i + 1}/{len(page_listings)}] {listing['address']}...",
@@ -147,14 +151,21 @@ class ListingProvider(ABC):
                     try:
                         dp = detail_ctx.new_page()
                         extras = self.scrape_detail(dp, listing["url"])
-                        listing.update(extras)
                     finally:
                         detail_ctx.close()
+                    if extras.pop("_removed", False):
+                        print(" removed (dropped)")
+                        time.sleep(0.5)
+                        continue
+                    listing.update(extras)
+                    kept_listings.append(listing)
                     print(" done")
                     time.sleep(0.5)
 
-                listings.extend(page_listings)
-                print(f"[{self.name}] Page {pg}: {len(page_listings)} listings (total: {len(listings)})")
+                listings.extend(kept_listings)
+                dropped = len(page_listings) - len(kept_listings)
+                drop_note = f", {dropped} dropped (removed)" if dropped else ""
+                print(f"[{self.name}] Page {pg}: {len(kept_listings)} listings{drop_note} (total: {len(listings)})")
 
             except Exception as e:
                 print(f"[{self.name}] Page {pg} failed: {type(e).__name__}: {e}")

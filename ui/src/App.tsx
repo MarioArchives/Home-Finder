@@ -15,6 +15,7 @@ import FilterToolbar from './components/FilterToolbar/FilterToolbar'
 import SortBar from './components/SortBar/SortBar'
 import WorkPinBar from './components/WorkPinBar/WorkPinBar'
 import CustomPinsBar from './components/CustomPinsBar/CustomPinsBar'
+import CronFooter from './components/CronFooter/CronFooter'
 import { PinPickerPopup } from './components/PinPicker/PinPicker'
 import './shared/mapIcons/mapIcons'
 import type { Listing, FilterState, DrillDownFilter } from './types/listing'
@@ -198,6 +199,8 @@ export default function App() {
             {selectedListing && (
                 <PropertyPopup listing={selectedListing} nearby={ld.nearbyCounts[selectedListing.url] ?? null} onClose={() => setSelectedListing(null)} valueRating={valueRatings[selectedListing.url]} />
             )}
+
+            <CronFooter />
         </>
     )
 }

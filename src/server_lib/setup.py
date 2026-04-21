@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .config import (
     DATA_DIR, CONFIG_FILE, setup_state, setup_preferences, setup_lock, ui_dir,
-    get_listings_file, get_amenities_file,
+    get_listings_file, get_amenities_file, load_telegram_env,
 )
 
 
@@ -228,6 +228,13 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
     import random
     rand_hour = random.randint(6, 22)
     rand_min = random.randint(0, 59)
+
+    # Ensure Telegram credentials saved via the UI are loaded into os.environ
+    # before we snapshot env for the cron job file. Without this, entrypoint's
+    # boot-time reinstall path writes an empty TELEGRAM_BOT_TOKEN into
+    # .env.cron (because docker-compose only exports the empty placeholder
+    # from .env.example), so cron-triggered alert checks silently skip sends.
+    load_telegram_env()
 
     env_file = DATA_DIR / ".env.cron"
     env_vars = {k: v for k, v in os.environ.items()
