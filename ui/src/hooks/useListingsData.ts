@@ -79,7 +79,7 @@ export function useListingsData(): ListingsDataResult {
     // ---- Load listings when ready ----
     useEffect(() => {
         if (appStatus !== 'ready') return
-        fetch('/listings.json')
+        fetch('/listings.json', { cache: 'no-cache' })
             .then((r) => { if (!r.ok) throw new Error('not found'); return r.json() })
             .then(setData)
             .catch(() => { })
@@ -89,9 +89,9 @@ export function useListingsData(): ListingsDataResult {
     useEffect(() => {
         if (!data?.listings?.length) return
         setNearbyStatus('loading')
-        fetch('/amenities.json')
+        fetch('/amenities.json', { cache: 'no-cache' })
             .then((r) => { if (!r.ok) throw new Error('no cache'); return r.json() })
-            .then((cached) => { setNearbyCounts(cached.properties); setNearbyStatus('done') })
+            .then((cached) => { setNearbyCounts(cached?.properties ?? {}); setNearbyStatus('done') })
             .catch(() => {
                 fetchNearbyAmenities(data.listings)
                     .then((counts) => { setNearbyCounts(counts); setNearbyStatus('done') })

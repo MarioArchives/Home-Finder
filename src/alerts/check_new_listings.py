@@ -35,6 +35,33 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"
 SEEN_FILE = DATA_DIR / "seen_listings.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 CHATS_FILE = DATA_DIR / "chat_ids.json"
+
+
+def _load_env_telegram() -> None:
+    """Populate TELEGRAM_* env vars from the data volume's .env.telegram file.
+
+    The UI writes credentials to this file on first setup. Callers like
+    entrypoint.sh's catch-up block or ad-hoc `python3 -m alerts.check_new_listings`
+    invocations don't source .env.cron, so without this Telegram sends silently
+    fall back to "Token not set, skipping." Loading here makes the module
+    self-sufficient regardless of how it's invoked.
+    """
+    tg = DATA_DIR / ".env.telegram"
+    if not tg.exists():
+        return
+    for line in tg.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if value and not os.environ.get(key):
+            os.environ[key] = value
+
+
+_load_env_telegram()
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 

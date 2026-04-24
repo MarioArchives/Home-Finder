@@ -16,6 +16,7 @@ Output:
 
 import argparse
 import json
+import random
 import sys
 import time
 import urllib.request
@@ -60,7 +61,7 @@ def fetch_overpass(bbox, wide_bbox, amenity_types):
     for atype in amenity_types:
         queries = OPTIONAL_AMENITY_QUERIES.get(atype, [])
         for q in queries:
-            optional_lines.append("  " + q.format(bbox=f"{ws},{ww},{wn},{we}"))
+            optional_lines.append("  " + q.format(bbox=f"{ws},{ww},{wn},{we}") + ";")
 
     optional_block = "\n".join(optional_lines)
     query = f"""
@@ -82,17 +83,26 @@ out center;"""
     endpoints = [
         "https://overpass-api.de/api/interpreter",
         "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter",
+        "https://overpass.osm.ch/api/interpreter",
     ]
+    random.shuffle(endpoints)
     data = urllib.parse.urlencode({"data": query}).encode()
+    headers = {"User-Agent": "moving-app/1.0 (+https://github.com/; property-scraper)"}
+    last_err = None
     for endpoint in endpoints:
-        try:
-            print(f"  Trying {endpoint}...")
-            req = urllib.request.Request(endpoint, data=data)
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                return json.loads(resp.read().decode())
-        except Exception as e:
-            print(f"  Failed: {e}")
-    raise RuntimeError("All Overpass endpoints failed.")
+        for attempt in range(1, 3):
+            try:
+                print(f"  Trying {endpoint} (attempt {attempt})...")
+                req = urllib.request.Request(endpoint, data=data, headers=headers)
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    return json.loads(resp.read().decode())
+            except Exception as e:
+                last_err = e
+                print(f"  Failed: {e}")
+                if attempt == 1:
+                    time.sleep(2)
+    raise RuntimeError(f"All Overpass endpoints failed. Last error: {last_err}")
 
 
 def categorise(element):

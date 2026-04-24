@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY ui/ ./
 # Replace broken symlinks with placeholder JSON for the Vite build.
 # At runtime the entrypoint symlinks real data into dist/.
-RUN rm -f public/listings.json public/amenities.json && echo '[]' > public/listings.json && echo '{}' > public/amenities.json
+RUN rm -f public/listings.json public/amenities.json && echo '[]' > public/listings.json && echo '{"properties":{}}' > public/amenities.json
 RUN npm run build
 
 # =============================================================================
