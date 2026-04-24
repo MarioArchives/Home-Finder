@@ -27,7 +27,7 @@ const TelegramSetup = lazy(() => import('./components/TelegramSetup/TelegramSetu
 const INITIAL_FILTERS: FilterState = {
     search: '', minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
     bathrooms: '', propertyType: '', propertyTypes: [], source: '',
-    furnishType: '', councilTax: '', minSqFt: '', maxSqFt: '',
+    furnishType: '', furnishTypes: [], councilTax: '', minSqFt: '', maxSqFt: '',
     availableFrom: '', availableTo: '', excludeShares: false,
     pinLat: '', pinLng: '', pinRadius: '',
 }

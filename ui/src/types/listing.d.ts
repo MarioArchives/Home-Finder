@@ -63,6 +63,7 @@ export interface ListingsData {
 }
 
 export interface FilterState {
+    search: string
     minPrice: string
     maxPrice: string
     bedrooms: string
@@ -72,6 +73,7 @@ export interface FilterState {
     propertyTypes: string[]
     source: string
     furnishType: string
+    furnishTypes: string[]
     councilTax: string
     minSqFt: string
     maxSqFt: string

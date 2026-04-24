@@ -20,7 +20,7 @@ export default function FurnishingChart({ data, onDrillDown }: FurnishingChartPr
             label={renderLabel}
             cursor="pointer"
             onClick={(data: any) => {
-              if (onDrillDown) onDrillDown({ furnishType: data.name !== 'Unknown' ? data.name : '' })
+              if (onDrillDown) onDrillDown({ furnishTypes: data.name !== 'Unknown' ? [data.name] : [] })
             }}
           >
             {data.map((_, i) => (

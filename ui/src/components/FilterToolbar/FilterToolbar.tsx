@@ -23,6 +23,7 @@ function hasActiveExtraFilters(filters: FilterState): boolean {
         filters.bathrooms ||
         filters.source ||
         filters.furnishType ||
+        filters.furnishTypes.length > 0 ||
         filters.councilTax ||
         filters.minSqFt ||
         filters.maxSqFt ||
@@ -33,9 +34,9 @@ function hasActiveExtraFilters(filters: FilterState): boolean {
 }
 
 const INITIAL_FILTERS: FilterState = {
-    minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
+    search: '', minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
     bathrooms: '', propertyType: '', propertyTypes: [], source: '',
-    furnishType: '', councilTax: '', minSqFt: '', maxSqFt: '',
+    furnishType: '', furnishTypes: [], councilTax: '', minSqFt: '', maxSqFt: '',
     availableFrom: '', availableTo: '', excludeShares: false,
     pinLat: '', pinLng: '', pinRadius: '',
 }
@@ -47,9 +48,9 @@ export default function FilterToolbar({
         setFilters((prev) => ({ ...prev, [key]: value }))
 
     const extraFilterCount = [
-        filters.bathrooms, filters.source, filters.furnishType, filters.councilTax,
+        filters.bathrooms, filters.source, filters.councilTax,
         filters.minSqFt, filters.maxSqFt, filters.availableFrom, filters.availableTo, filters.pinRadius,
-    ].filter(Boolean).length
+    ].filter(Boolean).length + (filters.furnishTypes.length > 0 ? 1 : 0)
 
     return (
         <>
@@ -152,10 +153,38 @@ export default function FilterToolbar({
                         </div>
                         <div className="filter-group">
                             <label>Furnishing</label>
-                            <select value={filters.furnishType} onChange={(e) => updateFilter('furnishType', e.target.value)}>
-                                <option value="">Any</option>
-                                {options.furnishTypes.map((f) => <option key={f} value={f}>{f}</option>)}
-                            </select>
+                            <div className="multi-select" tabIndex={0}>
+                                <div className="multi-select-display">
+                                    {filters.furnishTypes.length === 0
+                                        ? 'Any'
+                                        : filters.furnishTypes.length === 1
+                                            ? filters.furnishTypes[0]
+                                            : `${filters.furnishTypes.length} selected`}
+                                </div>
+                                <div className="multi-select-dropdown">
+                                    <button
+                                        className="multi-select-clear"
+                                        onClick={() => setFilters(prev => ({ ...prev, furnishTypes: [] }))}
+                                    >
+                                        Clear all
+                                    </button>
+                                    {options.furnishTypes.map((f) => (
+                                        <label key={f} className="multi-select-option">
+                                            <input
+                                                type="checkbox"
+                                                checked={filters.furnishTypes.includes(f)}
+                                                onChange={(e) => {
+                                                    const next = e.target.checked
+                                                        ? [...filters.furnishTypes, f]
+                                                        : filters.furnishTypes.filter((x) => x !== f)
+                                                    setFilters((prev) => ({ ...prev, furnishTypes: next }))
+                                                }}
+                                            />
+                                            {f}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                         <div className="filter-group">
                             <label>Max Council Tax</label>

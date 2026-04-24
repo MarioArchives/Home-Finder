@@ -105,6 +105,7 @@ export function useFilteredListings({
             if (filters.propertyTypes.length > 0 && !filters.propertyTypes.includes(l.property_type)) return false
             if (filters.source && l.source !== filters.source) return false
             if (filters.furnishType && l.furnish_type !== filters.furnishType) return false
+            if (filters.furnishTypes.length > 0 && (!l.furnish_type || !filters.furnishTypes.includes(l.furnish_type))) return false
             if (filters.excludeShares) {
                 const text = `${l.title} ${l.description} ${l.address}`.toLowerCase()
                 if (SHARE_KEYWORDS.some((kw) => text.includes(kw))) return false

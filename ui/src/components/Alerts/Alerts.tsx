@@ -328,6 +328,198 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
         return <div className="alerts-loading">Loading alerts...</div>
     }
 
+    const renderFormBody = (isInlineEdit: boolean) => (
+        <>
+            <div className="alert-form-grid">
+                {!isInlineEdit && (
+                    <div className="form-group form-group-wide">
+                        <label>Alert name *</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. 2-bed under 1200"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                        />
+                    </div>
+                )}
+                {isInlineEdit && (
+                    <div className="form-group form-group-wide">
+                        <label>Alert name *</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                        />
+                    </div>
+                )}
+                <div className="form-group">
+                    <label>Min price (pcm)</label>
+                    <input type="number" placeholder="e.g. 800" value={minPrice} onChange={e => setMinPrice(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Max price (pcm)</label>
+                    <input type="number" placeholder="e.g. 1500" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Min bedrooms</label>
+                    <select value={minBedrooms} onChange={e => setMinBedrooms(e.target.value)}>
+                        <option value="">Any</option>
+                        {bedroomCounts.map(n => <option key={n} value={n}>{n}+</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label>Max bedrooms</label>
+                    <select value={maxBedrooms} onChange={e => setMaxBedrooms(e.target.value)}>
+                        <option value="">Any</option>
+                        {bedroomCounts.map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label>Min bathrooms</label>
+                    <select value={minBathrooms} onChange={e => setMinBathrooms(e.target.value)}>
+                        <option value="">Any</option>
+                        {bathroomCounts.map(n => <option key={n} value={n}>{n}+</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label>Source</label>
+                    <select value={source} onChange={e => setSource(e.target.value)}>
+                        <option value="">Any</option>
+                        {sources.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div className="form-group form-group-wide">
+                    <label>Furnishing</label>
+                    <div className="band-toggles">
+                        {furnishTypes.map(f => (
+                            <button key={f} className={`band-toggle ${selectedFurnishTypes.includes(f) ? 'active' : ''}`} onClick={() => toggleFurnishType(f)}>
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label>Min sq ft</label>
+                    <input type="number" placeholder="e.g. 400" value={minSqFt} onChange={e => setMinSqFt(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Max sq ft</label>
+                    <input type="number" placeholder="e.g. 1000" value={maxSqFt} onChange={e => setMaxSqFt(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Available from</label>
+                    <input type="date" value={availableFrom} onChange={e => setAvailableFrom(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Available to</label>
+                    <input type="date" value={availableTo} onChange={e => setAvailableTo(e.target.value)} />
+                </div>
+                <div className="form-group form-group-wide">
+                    <label>Search keywords</label>
+                    <input type="text" placeholder="e.g. parking, garden" value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label>Distance from pin</label>
+                    <select
+                        value={pinRadius}
+                        onChange={e => {
+                            setPinRadius(e.target.value)
+                            if (e.target.value) setShowPinPopup(true)
+                        }}
+                    >
+                        <option value="">Off</option>
+                        <option value="1">Within 1 km</option>
+                        <option value="2">Within 2 km</option>
+                        <option value="5">Within 5 km</option>
+                        <option value="10">Within 10 km</option>
+                    </select>
+                </div>
+                {pinLat && pinLng && (
+                    <div className="form-group form-group-wide pin-active-bar-inline">
+                        <span>Pin: {parseFloat(pinLat).toFixed(4)}, {parseFloat(pinLng).toFixed(4)} — {pinRadius}km radius</span>
+                        <button type="button" className="pin-change-btn" onClick={() => setShowPinPopup(true)}>Change</button>
+                        <button type="button" className="pin-change-btn" onClick={() => { setPinLat(''); setPinLng(''); setPinRadius('') }}>Remove</button>
+                    </div>
+                )}
+                <div className="form-group form-group-wide">
+                    <label>Council tax bands</label>
+                    <div className="band-toggles">
+                        {COUNCIL_TAX_BANDS.map(band => (
+                            <button key={band} className={`band-toggle ${selectedTaxBands.includes(band) ? 'active' : ''}`} onClick={() => toggleTaxBand(band)}>
+                                {band}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {propertyTypes.length > 0 && (
+                    <div className="form-group form-group-wide">
+                        <label>Property types</label>
+                        <div className="property-type-toggles">
+                            {propertyTypes.map(type => (
+                                <button key={type} className={`type-toggle ${selectedPropertyTypes.includes(type) ? 'active' : ''}`} onClick={() => togglePropertyType(type)}>
+                                    {type}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                <div className="form-group">
+                    <label className="checkbox-label">
+                        <input type="checkbox" checked={excludeShares} onChange={e => setExcludeShares(e.target.checked)} />
+                        Exclude shares
+                    </label>
+                </div>
+                <div className="form-group form-group-wide">
+                    <label>Send to chats</label>
+                    {chats.length > 0 && (
+                        <>
+                            <div className="band-toggles">
+                                {chats.map(c => (
+                                    <button key={c.chat_id} className={`band-toggle ${selectedChatIds.length === 0 || selectedChatIds.includes(c.chat_id) ? 'active' : ''}`} onClick={() => toggleChatId(c.chat_id)}>
+                                        {c.name}
+                                    </button>
+                                ))}
+                            </div>
+                            <span className="form-hint">
+                                {selectedChatIds.length === 0 ? 'All chats selected' : `${selectedChatIds.length} of ${chats.length} selected`}
+                            </span>
+                        </>
+                    )}
+                    <div className="discover-chats-row">
+                        <button type="button" className="btn-discover-chats" onClick={discoverChats} disabled={discovering}>
+                            {discovering ? 'Searching...' : 'Discover chats'}
+                        </button>
+                        {discoverStatus && <span className="form-hint">{discoverStatus}</span>}
+                    </div>
+                </div>
+            </div>
+            <div className="alert-form-actions">
+                <button className="btn-cancel-edit" onClick={handleCancel} disabled={saving}>Cancel</button>
+                <button className="btn-save-alert" onClick={handleSave} disabled={!name.trim() || saving}>
+                    {saving ? 'Saving...' : editingId ? 'Update Alert' : 'Save Alert'}
+                </button>
+            </div>
+            {showPinPopup && pinRadius && (
+                <PinPickerPopup
+                    lat={pinLat}
+                    lng={pinLng}
+                    radius={Number(pinRadius)}
+                    onSubmit={(lat: number, lng: number) => {
+                        setPinLat(String(lat))
+                        setPinLng(String(lng))
+                        setShowPinPopup(false)
+                    }}
+                    onClose={() => {
+                        setShowPinPopup(false)
+                        if (!pinLat || !pinLng) {
+                            setPinRadius('')
+                        }
+                    }}
+                />
+            )}
+        </>
+    )
+
     return (
         <div className="alerts-container">
             <div className="alerts-header">
@@ -337,248 +529,20 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                         Set up alerts with your criteria. The app checks daily at a random time for new listings matching your parameters and sends notifications via Telegram.
                     </p>
                 </div>
-                <button className="btn-new-alert" onClick={() => {
-                    if (showForm) { handleCancel() } else { setShowForm(true) }
-                }}>
-                    {showForm ? 'Cancel' : '+ New Alert'}
+                <button
+                    className="btn-new-alert"
+                    onClick={() => {
+                        if (showForm) { handleCancel() } else { setShowForm(true) }
+                    }}
+                    disabled={editingId != null}
+                >
+                    {showForm && !editingId ? 'Cancel' : '+ New Alert'}
                 </button>
             </div>
 
-            {showForm && (
+            {showForm && !editingId && (
                 <div className="alert-form">
-                    <div className="alert-form-grid">
-                        <div className="form-group form-group-wide">
-                            <label>Alert name *</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. 2-bed under 1200"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Min price (pcm)</label>
-                            <input
-                                type="number"
-                                placeholder="e.g. 800"
-                                value={minPrice}
-                                onChange={e => setMinPrice(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Max price (pcm)</label>
-                            <input
-                                type="number"
-                                placeholder="e.g. 1500"
-                                value={maxPrice}
-                                onChange={e => setMaxPrice(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Min bedrooms</label>
-                            <select value={minBedrooms} onChange={e => setMinBedrooms(e.target.value)}>
-                                <option value="">Any</option>
-                                {bedroomCounts.map(n => <option key={n} value={n}>{n}+</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Max bedrooms</label>
-                            <select value={maxBedrooms} onChange={e => setMaxBedrooms(e.target.value)}>
-                                <option value="">Any</option>
-                                {bedroomCounts.map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Min bathrooms</label>
-                            <select value={minBathrooms} onChange={e => setMinBathrooms(e.target.value)}>
-                                <option value="">Any</option>
-                                {bathroomCounts.map(n => <option key={n} value={n}>{n}+</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Source</label>
-                            <select value={source} onChange={e => setSource(e.target.value)}>
-                                <option value="">Any</option>
-                                {sources.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group form-group-wide">
-                            <label>Furnishing</label>
-                            <div className="band-toggles">
-                                {furnishTypes.map(f => (
-                                    <button
-                                        key={f}
-                                        className={`band-toggle ${selectedFurnishTypes.includes(f) ? 'active' : ''}`}
-                                        onClick={() => toggleFurnishType(f)}
-                                    >
-                                        {f}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label>Min sq ft</label>
-                            <input
-                                type="number"
-                                placeholder="e.g. 400"
-                                value={minSqFt}
-                                onChange={e => setMinSqFt(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Max sq ft</label>
-                            <input
-                                type="number"
-                                placeholder="e.g. 1000"
-                                value={maxSqFt}
-                                onChange={e => setMaxSqFt(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Available from</label>
-                            <input
-                                type="date"
-                                value={availableFrom}
-                                onChange={e => setAvailableFrom(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Available to</label>
-                            <input
-                                type="date"
-                                value={availableTo}
-                                onChange={e => setAvailableTo(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group form-group-wide">
-                            <label>Search keywords</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. parking, garden"
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Distance from pin</label>
-                            <select
-                                value={pinRadius}
-                                onChange={e => {
-                                    setPinRadius(e.target.value)
-                                    if (e.target.value) setShowPinPopup(true)
-                                }}
-                            >
-                                <option value="">Off</option>
-                                <option value="1">Within 1 km</option>
-                                <option value="2">Within 2 km</option>
-                                <option value="5">Within 5 km</option>
-                                <option value="10">Within 10 km</option>
-                            </select>
-                        </div>
-                        {pinLat && pinLng && (
-                            <div className="form-group form-group-wide pin-active-bar-inline">
-                                <span>Pin: {parseFloat(pinLat).toFixed(4)}, {parseFloat(pinLng).toFixed(4)} — {pinRadius}km radius</span>
-                                <button type="button" className="pin-change-btn" onClick={() => setShowPinPopup(true)}>Change</button>
-                                <button type="button" className="pin-change-btn" onClick={() => { setPinLat(''); setPinLng(''); setPinRadius('') }}>Remove</button>
-                            </div>
-                        )}
-                        <div className="form-group form-group-wide">
-                            <label>Council tax bands</label>
-                            <div className="band-toggles">
-                                {COUNCIL_TAX_BANDS.map(band => (
-                                    <button
-                                        key={band}
-                                        className={`band-toggle ${selectedTaxBands.includes(band) ? 'active' : ''}`}
-                                        onClick={() => toggleTaxBand(band)}
-                                    >
-                                        {band}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        {propertyTypes.length > 0 && (
-                            <div className="form-group form-group-wide">
-                                <label>Property types</label>
-                                <div className="property-type-toggles">
-                                    {propertyTypes.map(type => (
-                                        <button
-                                            key={type}
-                                            className={`type-toggle ${selectedPropertyTypes.includes(type) ? 'active' : ''}`}
-                                            onClick={() => togglePropertyType(type)}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="form-group">
-                            <label className="checkbox-label">
-                                <input
-                                    type="checkbox"
-                                    checked={excludeShares}
-                                    onChange={e => setExcludeShares(e.target.checked)}
-                                />
-                                Exclude shares
-                            </label>
-                        </div>
-                        <div className="form-group form-group-wide">
-                            <label>Send to chats</label>
-                            {chats.length > 0 && (
-                                <>
-                                    <div className="band-toggles">
-                                        {chats.map(c => (
-                                            <button
-                                                key={c.chat_id}
-                                                className={`band-toggle ${selectedChatIds.length === 0 || selectedChatIds.includes(c.chat_id) ? 'active' : ''}`}
-                                                onClick={() => toggleChatId(c.chat_id)}
-                                            >
-                                                {c.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <span className="form-hint">
-                                        {selectedChatIds.length === 0 ? 'All chats selected' : `${selectedChatIds.length} of ${chats.length} selected`}
-                                    </span>
-                                </>
-                            )}
-                            <div className="discover-chats-row">
-                                <button
-                                    type="button"
-                                    className="btn-discover-chats"
-                                    onClick={discoverChats}
-                                    disabled={discovering}
-                                >
-                                    {discovering ? 'Searching...' : 'Discover chats'}
-                                </button>
-                                {discoverStatus && <span className="form-hint">{discoverStatus}</span>}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="alert-form-actions">
-                        <button className="btn-save-alert" onClick={handleSave} disabled={!name.trim() || saving}>
-                            {saving ? 'Saving...' : editingId ? 'Update Alert' : 'Save Alert'}
-                        </button>
-                    </div>
-
-                    {showPinPopup && pinRadius && (
-                        <PinPickerPopup
-                            lat={pinLat}
-                            lng={pinLng}
-                            radius={Number(pinRadius)}
-                            onSubmit={(lat: number, lng: number) => {
-                                setPinLat(String(lat))
-                                setPinLng(String(lng))
-                                setShowPinPopup(false)
-                            }}
-                            onClose={() => {
-                                setShowPinPopup(false)
-                                if (!pinLat || !pinLng) {
-                                    setPinRadius('')
-                                }
-                            }}
-                        />
-                    )}
+                    {renderFormBody(false)}
                 </div>
             )}
 
@@ -589,101 +553,114 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                 </div>
             ) : (
                 <div className="alerts-list">
-                    {alerts.map(a => (
-                        <div key={a.id} className="alert-card">
-                            <div className="alert-card-header">
-                                <h3>{a.name}</h3>
-                                <button className="btn-delete-alert" onClick={() => handleDelete(a.id)} title="Delete alert">
-                                    &times;
-                                </button>
-                            </div>
-                            <div className="alert-card-criteria">
-                                {a.minPrice != null && (
-                                    <span className="alert-tag">Min £{a.minPrice} pcm</span>
-                                )}
-                                {a.maxPrice != null && (
-                                    <span className="alert-tag">Max £{a.maxPrice} pcm</span>
-                                )}
-                                {(a.minBedrooms != null || a.maxBedrooms != null) && (
-                                    <span className="alert-tag">
-                                        {a.minBedrooms != null && a.maxBedrooms != null
-                                            ? `${a.minBedrooms}–${a.maxBedrooms} beds`
-                                            : a.minBedrooms != null
-                                                ? `${a.minBedrooms}+ beds`
-                                                : `Up to ${a.maxBedrooms} beds`}
-                                    </span>
-                                )}
-                                {a.minBathrooms != null && (
-                                    <span className="alert-tag">{a.minBathrooms}+ baths</span>
-                                )}
-                                {a.source && (
-                                    <span className="alert-tag">{a.source}</span>
-                                )}
-                                {a.councilTaxBands && a.councilTaxBands.length > 0 && (
-                                    <span className="alert-tag">Tax: {a.councilTaxBands.join(', ')}</span>
-                                )}
-                                {a.propertyTypes && a.propertyTypes.length > 0 && (
-                                    <span className="alert-tag">{a.propertyTypes.join(', ')}</span>
-                                )}
-                                {a.furnishTypes && a.furnishTypes.length > 0 && (
-                                    <span className="alert-tag">{a.furnishTypes.join(', ')}</span>
-                                )}
-                                {a.minSqFt != null && (
-                                    <span className="alert-tag">Min {a.minSqFt} sq ft</span>
-                                )}
-                                {a.maxSqFt != null && (
-                                    <span className="alert-tag">Max {a.maxSqFt} sq ft</span>
-                                )}
-                                {a.availableFrom && (
-                                    <span className="alert-tag">From {a.availableFrom}</span>
-                                )}
-                                {a.availableTo && (
-                                    <span className="alert-tag">Until {a.availableTo}</span>
-                                )}
-                                {a.pinRadius != null && (
-                                    <span className="alert-tag">Within {a.pinRadius}km of pin</span>
-                                )}
-                                {a.excludeShares && (
-                                    <span className="alert-tag">No shares</span>
-                                )}
-                                {a.search && (
-                                    <span className="alert-tag">"{a.search}"</span>
-                                )}
-                                {a.chatIds && a.chatIds.length > 0 && (
-                                    <span className="alert-tag">
-                                        Chats: {a.chatIds.map(cid => chats.find(c => c.chat_id === cid)?.name || cid).join(', ')}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="alert-card-footer">
-                                <span>Created {new Date(a.createdAt).toLocaleDateString()}</span>
-                                <div className="alert-card-actions">
-                                    <button className="btn-edit-alert" onClick={() => handleEdit(a)}>
-                                        Edit
-                                    </button>
-                                    <button
-                                        className="btn-test-alert"
-                                        onClick={() => handleTest(a.id)}
-                                        disabled={testing === a.id}
-                                    >
-                                        {testing === a.id ? 'Sending...' : 'Test on Telegram'}
-                                    </button>
-                                </div>
-                            </div>
-                            {testResult?.id === a.id && (
-                                <div className="alert-test-result">
-                                    <strong>{testResult.matches} match{testResult.matches !== 1 ? 'es' : ''}</strong> sent to Telegram
-                                    {testResult.urls.length > 0 && (
-                                        <ul className="alert-test-urls">
-                                            {testResult.urls.map(url => (
-                                                <li key={url}><a href={url} target="_blank" rel="noreferrer">{url}</a></li>
-                                            ))}
-                                        </ul>
+                    {alerts.map(a => {
+                        const isEditing = editingId === a.id
+                        return (
+                            <div key={a.id} className={`alert-card ${isEditing ? 'alert-card-editing' : ''}`}>
+                                <div className="alert-card-header">
+                                    <h3>{isEditing ? (name || a.name) : a.name}</h3>
+                                    {!isEditing && (
+                                        <button className="btn-delete-alert" onClick={() => handleDelete(a.id)} title="Delete alert">
+                                            &times;
+                                        </button>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                    ))}
+                                {isEditing ? (
+                                    <div className="alert-edit-body">
+                                        {renderFormBody(true)}
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="alert-card-criteria">
+                                            {a.minPrice != null && (
+                                                <span className="alert-tag">Min £{a.minPrice} pcm</span>
+                                            )}
+                                            {a.maxPrice != null && (
+                                                <span className="alert-tag">Max £{a.maxPrice} pcm</span>
+                                            )}
+                                            {(a.minBedrooms != null || a.maxBedrooms != null) && (
+                                                <span className="alert-tag">
+                                                    {a.minBedrooms != null && a.maxBedrooms != null
+                                                        ? `${a.minBedrooms}–${a.maxBedrooms} beds`
+                                                        : a.minBedrooms != null
+                                                            ? `${a.minBedrooms}+ beds`
+                                                            : `Up to ${a.maxBedrooms} beds`}
+                                                </span>
+                                            )}
+                                            {a.minBathrooms != null && (
+                                                <span className="alert-tag">{a.minBathrooms}+ baths</span>
+                                            )}
+                                            {a.source && (
+                                                <span className="alert-tag">{a.source}</span>
+                                            )}
+                                            {a.councilTaxBands && a.councilTaxBands.length > 0 && (
+                                                <span className="alert-tag">Tax: {a.councilTaxBands.join(', ')}</span>
+                                            )}
+                                            {a.propertyTypes && a.propertyTypes.length > 0 && (
+                                                <span className="alert-tag">{a.propertyTypes.join(', ')}</span>
+                                            )}
+                                            {a.furnishTypes && a.furnishTypes.length > 0 && (
+                                                <span className="alert-tag">{a.furnishTypes.join(', ')}</span>
+                                            )}
+                                            {a.minSqFt != null && (
+                                                <span className="alert-tag">Min {a.minSqFt} sq ft</span>
+                                            )}
+                                            {a.maxSqFt != null && (
+                                                <span className="alert-tag">Max {a.maxSqFt} sq ft</span>
+                                            )}
+                                            {a.availableFrom && (
+                                                <span className="alert-tag">From {a.availableFrom}</span>
+                                            )}
+                                            {a.availableTo && (
+                                                <span className="alert-tag">Until {a.availableTo}</span>
+                                            )}
+                                            {a.pinRadius != null && (
+                                                <span className="alert-tag">Within {a.pinRadius}km of pin</span>
+                                            )}
+                                            {a.excludeShares && (
+                                                <span className="alert-tag">No shares</span>
+                                            )}
+                                            {a.search && (
+                                                <span className="alert-tag">"{a.search}"</span>
+                                            )}
+                                            {a.chatIds && a.chatIds.length > 0 && (
+                                                <span className="alert-tag">
+                                                    Chats: {a.chatIds.map(cid => chats.find(c => c.chat_id === cid)?.name || cid).join(', ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="alert-card-footer">
+                                            <span>Created {new Date(a.createdAt).toLocaleDateString()}</span>
+                                            <div className="alert-card-actions">
+                                                <button className="btn-edit-alert" onClick={() => handleEdit(a)}>
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    className="btn-test-alert"
+                                                    onClick={() => handleTest(a.id)}
+                                                    disabled={testing === a.id}
+                                                >
+                                                    {testing === a.id ? 'Sending...' : 'Test on Telegram'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {testResult?.id === a.id && (
+                                            <div className="alert-test-result">
+                                                <strong>{testResult.matches} match{testResult.matches !== 1 ? 'es' : ''}</strong> sent to Telegram
+                                                {testResult.urls.length > 0 && (
+                                                    <ul className="alert-test-urls">
+                                                        {testResult.urls.map(url => (
+                                                            <li key={url}><a href={url} target="_blank" rel="noreferrer">{url}</a></li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
             )}
         </div>

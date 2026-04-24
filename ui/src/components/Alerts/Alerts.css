@@ -153,6 +153,40 @@
     margin-top: 16px;
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-cancel-edit {
+    padding: 9px 20px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.btn-cancel-edit:hover:not(:disabled) {
+    border-color: var(--text-h);
+}
+
+.btn-cancel-edit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.alert-card-editing {
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent);
+}
+
+.alert-edit-body {
+    padding-top: 14px;
+    margin-top: 6px;
+    border-top: 1px solid var(--border);
+    animation: slideDown 0.15s ease-out;
 }
 
 .btn-save-alert {
