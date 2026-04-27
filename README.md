@@ -49,9 +49,21 @@ The container starts fast and:
 
 If the container was off when a job was due, the entrypoint runs a **catch-up** for any job whose last run is older than its normal interval.
 
+You can query the next scheduled run time at any moment by sending `/status` to your Telegram bot or by calling `GET /api/cron/status` directly.
+
 ## Alerts
 
 The UI has an **Alerts** tab where you define criteria (max price, min bedrooms, council tax bands, property types, pin radius, etc.). The daily alert job sends matches to Telegram as a **photo + caption** (property image + key fields + link), falling back to plain text when an image isn't available.
+
+## Telegram Bot Commands
+
+Once your bot is connected (via the setup wizard), the server runs a long-poll listener that responds to commands sent to the bot. Only chat IDs already registered in `chat_ids.json` get a reply — unknown senders are ignored.
+
+| Command | Reply |
+|---|---|
+| `/status` | Current job state (idle vs scraping/alerts/amenities running, with per-source progress %) plus the next scheduled run time for each cron job and the timestamp of the last completed scrape. |
+
+The listener uses `getUpdates` long-polling against the Telegram Bot API; no inbound webhook setup is required. Update offsets persist in `data/telegram_offset.txt` so restarts don't replay old messages.
 
 ## Environment Variables
 

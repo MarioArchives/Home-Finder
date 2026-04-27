@@ -1,4 +1,5 @@
 import type { FilterState } from '../../types/listing'
+import DateInput from '../../shared/DateInput/DateInput'
 
 interface FilterOptions {
     propertyTypes: string[]
@@ -203,11 +204,11 @@ export default function FilterToolbar({
                         </div>
                         <div className="filter-group">
                             <label>Available from</label>
-                            <input type="date" value={filters.availableFrom} onChange={(e) => updateFilter('availableFrom', e.target.value)} />
+                            <DateInput value={filters.availableFrom} onChange={v => updateFilter('availableFrom', v)} />
                         </div>
                         <div className="filter-group">
                             <label>Available to</label>
-                            <input type="date" value={filters.availableTo} onChange={(e) => updateFilter('availableTo', e.target.value)} />
+                            <DateInput value={filters.availableTo} onChange={v => updateFilter('availableTo', v)} />
                         </div>
                         <div className="filter-group">
                             <label>Distance from pin</label>

@@ -1,10 +1,14 @@
 """Route handler for /api/cron/status — cron job progress for UI footer."""
 
+import datetime as _dt
 import os
 import re
 from pathlib import Path
 
 from .config import DATA_DIR, get_config, get_listings_file
+
+
+CRONTAB_FILE = Path("/etc/cron.d/property-update")
 
 
 # Map a command line fragment to a display job name.
@@ -176,12 +180,102 @@ def _iso_from_epoch(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+def _parse_cron_field(token: str, lo: int, hi: int) -> set[int]:
+    """Parse a cron field. Supports '*' and comma-separated integers.
+
+    Step values and ranges aren't used by the app's crontab so they're not
+    handled — extend if a new schedule needs them.
+    """
+    if token == "*":
+        return set(range(lo, hi + 1))
+    out: set[int] = set()
+    for part in token.split(","):
+        try:
+            out.add(int(part))
+        except ValueError:
+            pass
+    return out
+
+
+_JOB_LABELS = (
+    ("scrape_listings.py", "scrape"),
+    ("alerts.check_new_listings", "alerts"),
+    ("fetch_amenities.py", "amenities"),
+)
+
+
+def _label_for_command(command: str) -> str | None:
+    for needle, label in _JOB_LABELS:
+        if needle in command:
+            return label
+    return None
+
+
+def _next_fire(minute: str, hour: str, dom: str, month: str, dow: str,
+               now: _dt.datetime) -> _dt.datetime | None:
+    minutes = _parse_cron_field(minute, 0, 59)
+    hours = _parse_cron_field(hour, 0, 23)
+    doms = _parse_cron_field(dom, 1, 31)
+    months = _parse_cron_field(month, 1, 12)
+    # Cron weekday: 0=Sunday..6=Saturday. Python weekday(): 0=Monday..6=Sunday.
+    dows = _parse_cron_field(dow, 0, 6)
+
+    candidate = (now + _dt.timedelta(minutes=1)).replace(second=0, microsecond=0)
+    for _ in range(8 * 24 * 60):
+        cron_dow = (candidate.weekday() + 1) % 7
+        if (candidate.minute in minutes and candidate.hour in hours
+                and candidate.day in doms and candidate.month in months
+                and cron_dow in dows):
+            return candidate
+        candidate += _dt.timedelta(minutes=1)
+    return None
+
+
+def next_runs() -> list[dict]:
+    """Parse the installed crontab and return upcoming run times per job.
+
+    Returns [{job, schedule, next_iso, next_epoch}, ...] sorted by soonest.
+    Empty when crontab file missing (e.g. local dev outside the container).
+    """
+    if not CRONTAB_FILE.exists():
+        return []
+    now = _dt.datetime.now(_dt.timezone.utc)
+    results: list[dict] = []
+    for line in CRONTAB_FILE.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        # Skip env assignment lines like "PATH=/usr/local/bin:..."
+        head = stripped.split(None, 1)[0]
+        if "=" in head:
+            continue
+        parts = stripped.split(None, 5)
+        if len(parts) < 6:
+            continue
+        minute, hour, dom, month, dow, command = parts
+        label = _label_for_command(command)
+        if not label:
+            continue
+        nxt = _next_fire(minute, hour, dom, month, dow, now)
+        if not nxt:
+            continue
+        results.append({
+            "job": label,
+            "schedule": f"{minute} {hour} {dom} {month} {dow}",
+            "next_iso": nxt.isoformat(),
+            "next_epoch": nxt.timestamp(),
+        })
+    results.sort(key=lambda r: r["next_epoch"])
+    return results
+
+
 def handle_cron_status(handler):
     job = _running_job()
     payload = {
         "running": bool(job),
         "job": job,
         "last_scrape": _last_scrape_mtime(),
+        "next_runs": next_runs(),
         **_scrape_progress(job),
     }
     handler._json_response(200, payload)

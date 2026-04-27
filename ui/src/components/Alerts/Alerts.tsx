@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet'
 import type { Alert, Chat } from '../../types/listing'
 import '../../shared/mapIcons/mapIcons'
+import DateInput, { isoToDMY } from '../../shared/DateInput/DateInput'
 import './Alerts.css'
 
 function PinPickerPopup({ lat, lng, radius, onSubmit, onClose }: {
@@ -408,11 +409,11 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                 </div>
                 <div className="form-group">
                     <label>Available from</label>
-                    <input type="date" value={availableFrom} onChange={e => setAvailableFrom(e.target.value)} />
+                    <DateInput value={availableFrom} onChange={setAvailableFrom} />
                 </div>
                 <div className="form-group">
                     <label>Available to</label>
-                    <input type="date" value={availableTo} onChange={e => setAvailableTo(e.target.value)} />
+                    <DateInput value={availableTo} onChange={setAvailableTo} />
                 </div>
                 <div className="form-group form-group-wide">
                     <label>Search keywords</label>
@@ -609,10 +610,10 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                                 <span className="alert-tag">Max {a.maxSqFt} sq ft</span>
                                             )}
                                             {a.availableFrom && (
-                                                <span className="alert-tag">From {a.availableFrom}</span>
+                                                <span className="alert-tag">From {isoToDMY(a.availableFrom)}</span>
                                             )}
                                             {a.availableTo && (
-                                                <span className="alert-tag">Until {a.availableTo}</span>
+                                                <span className="alert-tag">Until {isoToDMY(a.availableTo)}</span>
                                             )}
                                             {a.pinRadius != null && (
                                                 <span className="alert-tag">Within {a.pinRadius}km of pin</span>

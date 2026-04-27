@@ -27,6 +27,7 @@ from server_lib.routes_telegram import (
     handle_discover_chats, handle_add_chat,
 )
 from server_lib.routes_cron import handle_cron_status
+from server_lib.telegram_listener import start_listener
 
 from server_lib import config as cfg
 
@@ -137,6 +138,7 @@ def main():
     os.chdir(directory)
     server = ThreadingHTTPServer(("0.0.0.0", port), AppHandler)
     print(f"Serving on http://0.0.0.0:{port} (directory: {directory})")
+    start_listener()
     server.serve_forever()
 
 
