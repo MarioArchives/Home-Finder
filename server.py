@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from server_lib.config import load_telegram_env
-from server_lib.routes_setup import handle_status, handle_setup_post, handle_setup_progress, handle_setup_preferences
+from server_lib.routes_setup import handle_status, handle_setup_post, handle_setup_progress, handle_setup_preferences, handle_sources
 from server_lib.routes_alerts import (
     handle_alerts_get, handle_alerts_post, handle_alert_test,
     handle_alert_put, handle_alert_delete,
@@ -39,6 +39,8 @@ class AppHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/status":
             handle_status(self)
+        elif self.path == "/api/sources":
+            handle_sources(self)
         elif self.path == "/api/setup/progress":
             handle_setup_progress(self)
         elif self.path == "/api/alerts":

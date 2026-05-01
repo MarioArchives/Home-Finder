@@ -13,6 +13,19 @@
     background: var(--card-bg);
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow);
+    text-align: left;
+    width: 100%;
+}
+
+button.cron-footer {
+    border: none;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+    font: inherit;
+}
+
+button.cron-footer:hover {
+    filter: brightness(0.97);
 }
 
 .cron-footer strong {
@@ -30,12 +43,20 @@
     background: #d1fae5;
 }
 
+.cron-footer--error {
+    border-top-color: #dc2626;
+    background: #fee2e2;
+}
+
 @media (prefers-color-scheme: dark) {
     .cron-footer--running {
         background: #1e3a5f;
     }
     .cron-footer--idle {
         background: #14432f;
+    }
+    .cron-footer--error {
+        background: #4c1d1d;
     }
 }
 
@@ -184,8 +205,30 @@
 }
 
 .cron-modal__src-name {
-    text-transform: capitalize;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
+}
+
+.cron-modal__src-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cron-footer__source-dots {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.cron-footer__source-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
 
 .cron-modal__pct {
@@ -245,6 +288,12 @@
     box-shadow: none;
 }
 
+.cron-footer--error .cron-footer__dot {
+    background: #dc2626;
+    animation: none;
+    box-shadow: none;
+}
+
 @keyframes cron-footer-pulse {
     0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
     70% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
@@ -257,4 +306,97 @@
         70% { box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
         100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
     }
+}
+
+/* ===== Per-stage status rows ===== */
+
+.cron-modal__stages {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cron-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border);
+}
+
+.cron-stage--ok       { border-color: rgba(16, 185, 129, 0.4); }
+.cron-stage--failing  { border-color: rgba(220, 38, 38, 0.6);  background: rgba(220, 38, 38, 0.06); }
+.cron-stage--stale    { border-color: rgba(220, 38, 38, 0.6);  background: rgba(220, 38, 38, 0.10); }
+.cron-stage--pending  { border-color: rgba(0, 0, 0, 0.1); }
+
+.cron-stage__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-h);
+}
+
+.cron-stage__name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.cron-stage__pip {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-light);
+    flex-shrink: 0;
+}
+
+.cron-stage__pip--ok       { background: var(--green); }
+.cron-stage__pip--failing  { background: #dc2626; }
+.cron-stage__pip--stale    { background: #dc2626; }
+.cron-stage__pip--pending  { background: #9ca3af; }
+
+.cron-stage__state {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-light);
+}
+
+.cron-stage--failing .cron-stage__state,
+.cron-stage--stale   .cron-stage__state {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.cron-stage__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.cron-stage__error {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #b91c1c;
+    word-break: break-word;
+    font-family: ui-monospace, monospace;
+    background: rgba(220, 38, 38, 0.08);
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .cron-stage              { background: rgba(255, 255, 255, 0.04); }
+    .cron-stage--failing,
+    .cron-stage--stale       { background: rgba(220, 38, 38, 0.18); }
+    .cron-stage__error       { color: #fca5a5; background: rgba(220, 38, 38, 0.18); }
+    .cron-stage--failing .cron-stage__state,
+    .cron-stage--stale   .cron-stage__state { color: #fca5a5; }
 }

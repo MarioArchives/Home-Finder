@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import EmojiSelection from '../CustomPinsBar/EmojiSelection'
 import { PinPickerInner } from '../PinPicker/PinPicker'
+import { sourceMeta } from '../../shared/sources'
 import './SetupProgress.css'
 
 interface SourceProgress {
@@ -27,13 +28,8 @@ interface ProgressData {
     preferences_submitted?: boolean
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-    rightmove: 'Rightmove',
-    zoopla: 'Zoopla',
-}
-
 function sourceLabel(name: string): string {
-    return SOURCE_LABELS[name] ?? (name.charAt(0).toUpperCase() + name.slice(1))
+    return sourceMeta(name).label
 }
 
 function sourcePercent(s: SourceProgress): number {
@@ -292,52 +288,70 @@ export default function SetupProgress({ onComplete, onTelegramConfigured }: Setu
 
                         {isScraping && !progress.awaiting_preferences && sourceEntries.length > 0 && (
                             <div className="progress-details">
-                                {sourceEntries.map(([name, s]) => (
-                                    <div
-                                        key={name}
-                                        className={`progress-source-row ${s.completed ? 'completed' : 'active'}`}
-                                    >
-                                        <div className="progress-source-head">
-                                            <span className="progress-source-name">
-                                                {s.completed ? '\u2713 ' : ''}{sourceLabel(name)}
-                                            </span>
-                                            {s.completed ? (
-                                                <span className="progress-source-summary">
-                                                    completed{(s.listings_found ?? 0) > 0
-                                                        ? ` \u2014 ${s.listings_found} listings`
-                                                        : ''}
-                                                </span>
-                                            ) : s.total_pages != null && (s.current_page ?? 0) > 0 ? (
-                                                <span className="progress-source-summary">
-                                                    Page {s.current_page} of {s.total_pages}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        {!s.completed && (
-                                            <>
-                                                <div className="progress-source-bar">
-                                                    <div
-                                                        className="progress-source-bar-fill"
-                                                        style={{ width: `${sourcePercent(s)}%` }}
+                                {sourceEntries.map(([name, s]) => {
+                                    const meta = sourceMeta(name)
+                                    const pct = sourcePercent(s)
+                                    return (
+                                        <div
+                                            key={name}
+                                            className={`progress-source-row ${s.completed ? 'completed' : 'active'}`}
+                                            style={!s.completed ? { ['--source-color' as string]: meta.color, ['--source-bg' as string]: meta.bg } : undefined}
+                                        >
+                                            <div className="progress-source-head">
+                                                <span
+                                                    className="progress-source-name"
+                                                    style={{ color: s.completed ? undefined : meta.color }}
+                                                >
+                                                    <span
+                                                        className="progress-source-dot"
+                                                        style={{ background: s.completed ? 'var(--green)' : meta.color }}
+                                                        aria-hidden
                                                     />
-                                                </div>
-                                                {s.detail_current != null && s.detail_total != null && (
-                                                    <div className="progress-stat">
-                                                        Fetching details: {s.detail_current} / {s.detail_total}
+                                                    {sourceLabel(name)}
+                                                </span>
+                                                {s.completed ? (
+                                                    <span className="progress-source-summary">
+                                                        {(s.listings_found ?? 0) > 0
+                                                            ? `${s.listings_found} listings found`
+                                                            : 'done'}
+                                                    </span>
+                                                ) : s.total_pages != null && (s.current_page ?? 0) > 0 ? (
+                                                    <span className="progress-source-summary">
+                                                        page {s.current_page}/{s.total_pages} \u00b7 {Math.round(pct)}%
+                                                    </span>
+                                                ) : (
+                                                    <span className="progress-source-summary">starting\u2026</span>
+                                                )}
+                                            </div>
+                                            {!s.completed && (
+                                                <>
+                                                    <div className="progress-source-bar">
+                                                        <div
+                                                            className="progress-source-bar-fill"
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                                background: meta.color,
+                                                            }}
+                                                        />
                                                     </div>
-                                                )}
-                                                {(s.listings_found ?? 0) > 0 && (
-                                                    <div className="progress-stat listings-count">
-                                                        {s.listings_found} listings found
-                                                    </div>
-                                                )}
-                                                {s.current_listing && (
-                                                    <div className="progress-listing">{s.current_listing}</div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
+                                                    {s.detail_current != null && s.detail_total != null && (
+                                                        <div className="progress-stat">
+                                                            fetching detail {s.detail_current}/{s.detail_total}
+                                                        </div>
+                                                    )}
+                                                    {(s.listings_found ?? 0) > 0 && (
+                                                        <div className="progress-stat listings-count">
+                                                            {s.listings_found} listings so far
+                                                        </div>
+                                                    )}
+                                                    {s.current_listing && (
+                                                        <div className="progress-listing">{s.current_listing}</div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </div>
                         )}
 

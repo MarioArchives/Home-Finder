@@ -9,6 +9,11 @@ from providers.base import ListingProvider
 
 class ZooplaProvider(ListingProvider):
     name = "zoopla"
+    display_name = "Zoopla"
+    icon = "\U0001F50D"
+    color = "#8046f1"
+    bg = "rgba(128, 70, 241, 0.12)"
+    supports_buy = True
 
     def resolve_location(self, page, city: str) -> str | None:
         """Zoopla uses a city slug directly — no resolution needed."""

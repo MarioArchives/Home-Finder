@@ -96,7 +96,12 @@ out center;"""
                 print(f"  Trying {endpoint} (attempt {attempt})...")
                 req = urllib.request.Request(endpoint, data=data, headers=headers)
                 with urllib.request.urlopen(req, timeout=120) as resp:
-                    return json.loads(resp.read().decode())
+                    result = json.loads(resp.read().decode())
+                if not result.get("elements"):
+                    last_err = f"empty response from {endpoint}"
+                    print(f"  Empty response, trying next endpoint...")
+                    break
+                return result
             except Exception as e:
                 last_err = e
                 print(f"  Failed: {e}")

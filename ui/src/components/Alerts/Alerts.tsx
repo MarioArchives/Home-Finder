@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-lea
 import type { Alert, Chat } from '../../types/listing'
 import '../../shared/mapIcons/mapIcons'
 import DateInput, { isoToDMY } from '../../shared/DateInput/DateInput'
+import { useSources, sourceMeta } from '../../shared/sources'
 import './Alerts.css'
 
 function PinPickerPopup({ lat, lng, radius, onSubmit, onClose }: {
@@ -72,12 +73,12 @@ interface AlertsProps {
     furnishTypes: string[]
     bedroomCounts: number[]
     bathroomCounts: number[]
-    sources: string[]
 }
 
 const COUNCIL_TAX_BANDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
-export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bathroomCounts, sources }: AlertsProps) {
+export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bathroomCounts }: AlertsProps) {
+    const sources = useSources()
     const [alerts, setAlerts] = useState<Alert[]>([])
     const [chats, setChats] = useState<Chat[]>([])
     const [loading, setLoading] = useState(true)
@@ -386,7 +387,7 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                     <label>Source</label>
                     <select value={source} onChange={e => setSource(e.target.value)}>
                         <option value="">Any</option>
-                        {sources.map(s => <option key={s} value={s}>{s}</option>)}
+                        {sources.map(s => <option key={s.name} value={s.name}>{s.label}</option>)}
                     </select>
                 </div>
                 <div className="form-group form-group-wide">
@@ -591,9 +592,18 @@ export default function Alerts({ propertyTypes, furnishTypes, bedroomCounts, bat
                                             {a.minBathrooms != null && (
                                                 <span className="alert-tag">{a.minBathrooms}+ baths</span>
                                             )}
-                                            {a.source && (
-                                                <span className="alert-tag">{a.source}</span>
-                                            )}
+                                            {a.source && (() => {
+                                                const m = sourceMeta(a.source)
+                                                return (
+                                                    <span
+                                                        className="alert-tag alert-tag-source"
+                                                        style={{ background: m.bg, color: m.color }}
+                                                    >
+                                                        <span aria-hidden style={{ marginRight: 4 }}>{m.icon}</span>
+                                                        {m.label}
+                                                    </span>
+                                                )
+                                            })()}
                                             {a.councilTaxBands && a.councilTaxBands.length > 0 && (
                                                 <span className="alert-tag">Tax: {a.councilTaxBands.join(', ')}</span>
                                             )}

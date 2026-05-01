@@ -18,7 +18,12 @@ import CustomPinsBar from './components/CustomPinsBar/CustomPinsBar'
 import CronFooter from './components/CronFooter/CronFooter'
 import { PinPickerPopup } from './components/PinPicker/PinPicker'
 import './shared/mapIcons/mapIcons'
+import { ensureSourcesLoaded } from './shared/sources'
 import type { Listing, FilterState, DrillDownFilter } from './types/listing'
+
+// Kick off the source registry fetch as early as possible so the first
+// render of any badge / setup screen has live backend metadata available.
+ensureSourcesLoaded()
 
 const Analytics = lazy(() => import('./components/Analytics/Analytics'))
 const Alerts = lazy(() => import('./components/Alerts/Alerts'))
@@ -188,7 +193,7 @@ export default function App() {
                     <Route path="/alerts" element={
                         <Suspense fallback={<div className="no-results">Loading...</div>}>
                             {ld.telegramConfigured
-                                ? <Alerts propertyTypes={options.propertyTypes} furnishTypes={options.furnishTypes} bedroomCounts={options.bedroomCounts} bathroomCounts={options.bathroomCounts} sources={options.sources} />
+                                ? <Alerts propertyTypes={options.propertyTypes} furnishTypes={options.furnishTypes} bedroomCounts={options.bedroomCounts} bathroomCounts={options.bathroomCounts} />
                                 : <TelegramSetup onComplete={() => ld.setTelegramConfigured(true)} />}
                         </Suspense>
                     } />

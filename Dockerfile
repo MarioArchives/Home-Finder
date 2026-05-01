@@ -18,10 +18,15 @@ RUN npm run build
 # =============================================================================
 FROM python:3.13-slim
 
-# Install cron and curl first
+# Install cron, curl, and tzdata. tzdata + TZ env let cron + Python honor
+# Europe/London (handles BST/GMT switch automatically).
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends cron curl
+    apt-get update && apt-get install -y --no-install-recommends cron curl tzdata && \
+    ln -sf /usr/share/zoneinfo/Europe/London /etc/localtime && \
+    echo "Europe/London" > /etc/timezone
+
+ENV TZ=Europe/London
 
 WORKDIR /app
 

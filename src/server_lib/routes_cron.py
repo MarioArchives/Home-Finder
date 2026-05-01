@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from .config import DATA_DIR, get_config, get_listings_file
+from cron.stage_status import load_status, summary_line
 
 
 CRONTAB_FILE = Path("/etc/cron.d/property-update")
@@ -143,8 +144,15 @@ def _scrape_progress(job: str | None) -> dict:
         pages_done = s["pages_done"]
         dc = s["detail_current"]
         dt = s["detail_total"]
-        partial = (dc / dt) if dt else 0
-        pct = ((pages_done + partial) / total_pages) * 100 if total_pages else 0
+        # `pages_done` is set when the page is *parsed*, but detail fetches
+        # for that same page happen afterwards. Treat detail progress as
+        # sub-progress within the current page (pages_done - 1 + dc/dt) so
+        # the bar doesn't pin at 100% while details are still running.
+        if dt > 0:
+            completed = max(0.0, pages_done - 1) + (dc / dt)
+        else:
+            completed = pages_done
+        pct = (completed / total_pages) * 100 if total_pages else 0
         pct = max(0.0, min(100.0, pct))
         per_source[name] = {
             "pages_done": pages_done,
@@ -176,24 +184,52 @@ def _last_scrape_mtime() -> str | None:
 
 
 def _iso_from_epoch(ts: float) -> str:
-    from datetime import datetime, timezone
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    # Local tz so timestamps in the UI match the cron schedule (which fires
+    # in container-local time, Europe/London via TZ env).
+    from datetime import datetime
+    return datetime.fromtimestamp(ts).astimezone().isoformat()
 
 
 def _parse_cron_field(token: str, lo: int, hi: int) -> set[int]:
-    """Parse a cron field. Supports '*' and comma-separated integers.
+    """Parse a cron field. Supports '*', integers, ranges (10-14), and steps.
 
-    Step values and ranges aren't used by the app's crontab so they're not
-    handled — extend if a new schedule needs them.
+    Comma-separated combinations work too: '0,30 9-17/2'. Anything that
+    fails to parse is silently dropped — install_cron is the only writer of
+    the crontab so unexpected syntax is unlikely in practice.
     """
     if token == "*":
         return set(range(lo, hi + 1))
+
+    def parse_part(part: str) -> set[int]:
+        # Handle step syntax: "<range>/<step>" e.g. "*/30", "10-14/2".
+        step = 1
+        if "/" in part:
+            base, _, step_s = part.partition("/")
+            try:
+                step = int(step_s)
+            except ValueError:
+                return set()
+        else:
+            base = part
+        if base == "*":
+            start, end = lo, hi
+        elif "-" in base:
+            a, _, b = base.partition("-")
+            try:
+                start, end = int(a), int(b)
+            except ValueError:
+                return set()
+        else:
+            try:
+                v = int(base)
+                return {v}
+            except ValueError:
+                return set()
+        return set(range(start, end + 1, max(1, step)))
+
     out: set[int] = set()
     for part in token.split(","):
-        try:
-            out.add(int(part))
-        except ValueError:
-            pass
+        out |= parse_part(part)
     return out
 
 
@@ -205,6 +241,20 @@ _JOB_LABELS = (
 
 
 def _label_for_command(command: str) -> str | None:
+    """Map a cron command line to a UI-friendly job label.
+
+    The pipeline cron lines invoke `cron.run_stage` rather than the
+    underlying scripts directly. `--stage scrape` resolves to "scrape", and
+    `--recover` (with optional `--final`) is shown as "recovery sweep" so
+    the next-runs list distinguishes the primary chain trigger from the
+    hourly sweeps.
+    """
+    if "cron.run_stage" in command:
+        m = re.search(r"--stage\s+(\w+)", command)
+        if m and m.group(1) in ("scrape", "amenities", "alerts"):
+            return m.group(1)
+        if "--recover" in command:
+            return "recovery"
     for needle, label in _JOB_LABELS:
         if needle in command:
             return label
@@ -239,7 +289,9 @@ def next_runs() -> list[dict]:
     """
     if not CRONTAB_FILE.exists():
         return []
-    now = _dt.datetime.now(_dt.timezone.utc)
+    # Use system-local time so cron field interpretation matches what cron
+    # itself sees (TZ=Europe/London is set in the Dockerfile).
+    now = _dt.datetime.now().astimezone()
     results: list[dict] = []
     for line in CRONTAB_FILE.read_text().splitlines():
         stripped = line.strip()
@@ -271,11 +323,14 @@ def next_runs() -> list[dict]:
 
 def handle_cron_status(handler):
     job = _running_job()
+    status = load_status()
     payload = {
         "running": bool(job),
         "job": job,
         "last_scrape": _last_scrape_mtime(),
         "next_runs": next_runs(),
+        "stages": status.get("stages", {}),
+        "status_summary": summary_line(status),
         **_scrape_progress(job),
     }
     handler._json_response(200, payload)

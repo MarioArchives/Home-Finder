@@ -22,7 +22,7 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 
 from dedupe import dedupe
-from providers import get_provider, get_all_provider_names, PROVIDERS
+from providers import get_provider, get_all_provider_names, resolve_sources
 
 
 def create_context(browser):
@@ -161,15 +161,11 @@ def main():
     max_pages = args.pages
     output_file = args.output or f"{city.lower().replace(' ', '_')}_{listing_type}_listings.json"
 
-    # Parse source list
-    if args.source == "all" or args.source == "both":
-        sources = all_names
-    else:
-        sources = [s.strip() for s in args.source.split(",")]
-        for s in sources:
-            if s not in PROVIDERS:
-                print(f"Error: Unknown source '{s}'. Available: {', '.join(all_names)}")
-                sys.exit(1)
+    try:
+        sources = resolve_sources(args.source)
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
     all_listings = scrape_all(sources, city, listing_type, max_pages)
 

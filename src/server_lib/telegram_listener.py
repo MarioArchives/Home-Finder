@@ -1,15 +1,19 @@
 """Telegram long-poll listener thread.
 
-Handles incoming bot commands (currently /status). Restricted to chat IDs
+Handles incoming bot commands (/status, /scrape). Restricted to chat IDs
 already registered in chat_ids.json — unknown senders are ignored silently.
 """
 
 import datetime as _dt
 import json
+import os
+import subprocess
+import sys
 import threading
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from . import config as cfg
 from .config import DATA_DIR
@@ -19,6 +23,8 @@ from .routes_cron import _running_job, _scrape_progress, _last_scrape_mtime, nex
 _OFFSET_FILE = DATA_DIR / "telegram_offset.txt"
 _LONG_POLL_TIMEOUT = 30
 _started = False
+# /app/src — same dir cron uses to invoke `python -m cron.run_stage`.
+_SRC_DIR = Path(__file__).resolve().parent.parent
 
 
 def _load_offset() -> int:
@@ -95,6 +101,31 @@ def _allowed_chat_ids() -> set[str]:
     return {str(c["chat_id"]) for c in load_chats()}
 
 
+def _trigger_pipeline() -> tuple[bool, str]:
+    """Kick off scrape→amenities→alerts as a detached child process.
+
+    Returns (started, reason). Refuses if a pipeline stage is already in
+    flight — `_running_job()` scans /proc for live scrape/amenities/alerts
+    cmdlines, so we get a useful reply instead of silently colliding with
+    the per-stage flock inside run_stage.
+    """
+    job = _running_job()
+    if job:
+        return False, f"{job} already running"
+    env = os.environ.copy()
+    pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{_SRC_DIR}:{pp}" if pp else str(_SRC_DIR)
+    subprocess.Popen(
+        [sys.executable, "-m", "cron.run_stage", "--stage", "scrape", "--force"],
+        cwd=str(_SRC_DIR),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return True, ""
+
+
 def _handle_command(text: str, chat_id: str) -> None:
     parts = text.strip().split()
     if not parts:
@@ -103,6 +134,19 @@ def _handle_command(text: str, chat_id: str) -> None:
     cmd = parts[0].split("@", 1)[0].lower()
     if cmd == "/status":
         send_telegram(_format_status(), chat_id=chat_id)
+    elif cmd == "/scrape":
+        started, reason = _trigger_pipeline()
+        if started:
+            send_telegram(
+                "🚀 <b>Pipeline started</b>: scrape → amenities → alerts.\n"
+                "Use /status for progress.",
+                chat_id=chat_id,
+            )
+        else:
+            send_telegram(
+                f"⚠️ Cannot start: {reason}.\nUse /status.",
+                chat_id=chat_id,
+            )
 
 
 def _process_update(update: dict) -> None:

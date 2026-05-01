@@ -20,7 +20,7 @@ from pathlib import Path
 
 from scrape_listings import scrape_all
 from dedupe import dedupe
-from providers import get_all_provider_names
+from providers import resolve_sources
 from alerts.alert_filter import matches_alert, parse_price, SHARE_KEYWORDS
 from alerts.format_notify import load_amenities, format_alert_summary, format_listing
 
@@ -214,14 +214,41 @@ def main():
     seen = load_seen()
     print(f"Loaded {len(seen)} previously seen listings.")
 
-    # Scrape — providers run concurrently when more than one is selected.
-    if SOURCE in ("all", "both"):
-        sources = get_all_provider_names()
-    else:
-        sources = [s.strip() for s in SOURCE.split(",")]
-    all_listings = scrape_all(sources, CITY, LISTING_TYPE, MAX_PAGES)
+    # Two paths:
+    #   1. ALERT_USE_EXISTING=1 — load the listings JSON written by an
+    #      earlier `run_stage scrape` call. This is the cron pipeline path:
+    #      scrape and alerts run in separate cron invocations so they can
+    #      fail/recover independently.
+    #   2. Otherwise — scrape directly (legacy/standalone usage).
+    all_listings: list[dict] = []
+    use_existing = os.environ.get("ALERT_USE_EXISTING") == "1"
+    listings_path_env = os.environ.get("ALERT_LISTINGS_FILE")
+    if use_existing:
+        listings_path = (
+            Path(listings_path_env) if listings_path_env
+            else DATA_DIR / f"{CITY.lower().replace(' ', '_')}_{LISTING_TYPE}_listings.json"
+        )
+        if not listings_path.exists():
+            print(f"ALERT_USE_EXISTING set but {listings_path} missing — falling back to scrape.")
+            use_existing = False
+        else:
+            try:
+                payload = json.loads(listings_path.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Failed to read {listings_path}: {e} — falling back to scrape.")
+                use_existing = False
+            else:
+                all_listings = payload.get("listings", []) if isinstance(payload, dict) else []
+                print(f"Loaded {len(all_listings)} listings from {listings_path.name}.")
 
-    print(f"Scraped {len(all_listings)} total listings.")
+    if not use_existing:
+        try:
+            sources = resolve_sources(SOURCE)
+        except ValueError as e:
+            print(f"Invalid SOURCE env value: {e}")
+            return
+        all_listings = scrape_all(sources, CITY, LISTING_TYPE, MAX_PAGES)
+        print(f"Scraped {len(all_listings)} total listings.")
 
     if not all_listings:
         print("Scrape returned nothing — skipping alert check to avoid wiping the seen file.")
@@ -249,8 +276,8 @@ def main():
         matches = [l for l in new_listings if matches_alert(l, alert)]
         print(f"Alert '{alert_name}': {len(matches)} match(es).")
 
+        targets = get_chat_ids_for_alert(alert_id)
         if matches:
-            targets = get_chat_ids_for_alert(alert_id)
             total = len(new_listings)
             pct = (len(matches) / total * 100) if total else 0
             header = format_alert_summary(alert)
@@ -264,6 +291,10 @@ def main():
                     chat_ids=targets,
                     photo_url=photo,
                 )
+        else:
+            header = format_alert_summary(alert)
+            header += f"\n\n🏠 <b>No new matches found today</b> ({len(new_listings)} new listing(s) scanned)"
+            notify(header, chat_ids=targets)
 
     # Update seen set with ALL listings (not just matches)
     for l in all_listings:

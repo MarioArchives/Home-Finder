@@ -1,5 +1,6 @@
 import type { FilterState } from '../../types/listing'
 import DateInput from '../../shared/DateInput/DateInput'
+import { useSources } from '../../shared/sources'
 
 interface FilterOptions {
     propertyTypes: string[]
@@ -45,6 +46,7 @@ const INITIAL_FILTERS: FilterState = {
 export default function FilterToolbar({
     filters, setFilters, options, showMoreFilters, setShowMoreFilters, onShowPinPopup,
 }: FilterToolbarProps) {
+    const allSources = useSources()
     const updateFilter = (key: keyof FilterState, value: string) =>
         setFilters((prev) => ({ ...prev, [key]: value }))
 
@@ -149,7 +151,7 @@ export default function FilterToolbar({
                             <label>Source</label>
                             <select value={filters.source} onChange={(e) => updateFilter('source', e.target.value)}>
                                 <option value="">Any</option>
-                                {options.sources.map((s) => <option key={s} value={s}>{s}</option>)}
+                                {allSources.map((s) => <option key={s.name} value={s.name}>{s.label}</option>)}
                             </select>
                         </div>
                         <div className="filter-group">

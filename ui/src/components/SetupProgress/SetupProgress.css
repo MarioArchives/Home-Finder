@@ -119,8 +119,19 @@
 }
 
 .progress-source-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
     color: var(--text-h);
+}
+
+.progress-source-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
 .progress-source-row.completed .progress-source-name {

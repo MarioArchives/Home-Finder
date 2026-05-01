@@ -11,6 +11,11 @@ from .data_store import load_chats
 
 from . import config as cfg
 
+# Late path-aware import: when the server runs from /app, providers/ is on
+# PYTHONPATH; when imported here it resolves the same registry module used by
+# scrape_listings.py.
+from providers import valid_source_values, list_provider_meta
+
 
 def handle_status(handler):
     status = get_status()
@@ -44,8 +49,9 @@ def handle_setup_post(handler, body):
     if listing_type not in ("rent", "buy"):
         handler._json_response(400, {"error": "Type must be 'rent' or 'buy'"})
         return
-    if source not in ("rightmove", "zoopla", "both"):
-        handler._json_response(400, {"error": "Source must be 'rightmove', 'zoopla', or 'both'"})
+    if source not in valid_source_values():
+        allowed = sorted(valid_source_values())
+        handler._json_response(400, {"error": f"Source must be one of: {', '.join(allowed)}"})
         return
 
     with setup_lock:
@@ -77,6 +83,11 @@ def handle_setup_preferences(handler, body):
         setup_preferences["submitted"] = True
 
     handler._json_response(200, {"ok": True})
+
+
+def handle_sources(handler):
+    """Return the live registry of listing providers + UI metadata."""
+    handler._json_response(200, {"sources": list_provider_meta()})
 
 
 def handle_setup_progress(handler):

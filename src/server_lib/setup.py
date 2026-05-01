@@ -12,6 +12,7 @@ from .config import (
     DATA_DIR, CONFIG_FILE, setup_state, setup_preferences, setup_lock, ui_dir,
     get_listings_file, get_amenities_file, load_telegram_env,
 )
+from providers import resolve_sources
 
 
 def _recompute_aggregates(progress):
@@ -92,7 +93,7 @@ def run_setup(city, listing_type, source, pages):
     listings_file = get_listings_file(city, listing_type)
     amenities_file = get_amenities_file(city, listing_type)
 
-    source_names = ["rightmove", "zoopla"] if source == "both" else [source]
+    source_names = resolve_sources(source)
     total_pages = pages * len(source_names)
     sources_state = {
         name: {
@@ -224,10 +225,25 @@ def run_setup(city, listing_type, source, pages):
 
 
 def install_cron(city, listing_type, source, pages, listings_file, amenities_file, amenities="climbing"):
-    """Install cron jobs for periodic scraping."""
+    """Install cron jobs for periodic scraping.
+
+    Schedule:
+      - Primary chain: at a random minute between 09:00 and 09:59 Europe/London,
+        kick off the scrape stage. On success, scrape triggers amenities, then
+        amenities triggers alerts (each as a fresh `run_stage` invocation so
+        the OS sees one job per stage and the UI footer can name it).
+      - Recovery sweep: hourly from 10:00 to 15:00 (6 attempts). Re-runs any
+        stage that hasn't succeeded today, in order. The 15:00 sweep is the
+        final attempt and may fire alerts with stale amenities so users still
+        get a daily Telegram even if Overpass is down.
+
+    `listings_file` and `amenities_file` are unused (run_stage derives them
+    from config) but kept in the signature to avoid breaking callers
+    (entrypoint.sh and the setup wizard both pass them).
+    """
     import random
-    rand_hour = random.randint(6, 22)
     rand_min = random.randint(0, 59)
+    del listings_file, amenities_file  # intentionally unused — see docstring
 
     # Ensure Telegram credentials saved via the UI are loaded into os.environ
     # before we snapshot env for the cron job file. Without this, entrypoint's
@@ -238,11 +254,15 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
 
     env_file = DATA_DIR / ".env.cron"
     env_vars = {k: v for k, v in os.environ.items()
-                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|PYTHONPATH)', k)}
-    env_vars.update({"CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source, "PAGES": str(pages), "AMENITIES": amenities, "PYTHONPATH": "/app/src"})
+                if re.match(r'^(CITY|LISTING_TYPE|PAGES|SOURCE|TELEGRAM_|DATA_DIR|PYTHONPATH|TZ)', k)}
+    env_vars.update({
+        "CITY": city, "LISTING_TYPE": listing_type, "SOURCE": source,
+        "PAGES": str(pages), "AMENITIES": amenities, "PYTHONPATH": "/app/src",
+        "TZ": env_vars.get("TZ", "Europe/London"),
+    })
     # `export` is required: cron sources this file under /bin/sh, and without
     # export these would be shell-local (not inherited by the python subprocess
-    # that runs `-m alerts.check_new_listings`, which needs PYTHONPATH set).
+    # that runs `-m cron.run_stage`, which needs PYTHONPATH set).
     env_file.write_text("\n".join(f"export {k}={v}" for k, v in env_vars.items()) + "\n")
 
     cron_content = f"""# Cron runs with a minimal PATH that doesn't include /usr/local/bin
@@ -250,14 +270,22 @@ def install_cron(city, listing_type, source, pages, listings_file, amenities_fil
 # with "python3: not found".
 PATH=/usr/local/bin:/usr/bin:/bin
 
-# Re-scrape listings daily at 6am
-0 6 * * * cd /app && . {env_file} && python3 /app/src/scrape_listings.py --city "$CITY" --type "$LISTING_TYPE" --pages "$PAGES" --source "$SOURCE" --output "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
+# Primary chain: scrape at 09:{rand_min:02d} Europe/London. Scrape success
+# triggers amenities (chained inside run_stage); amenities success triggers
+# alerts. Each stage has its own marker file in {DATA_DIR} so failures can be
+# recovered independently.
+{rand_min} 9 * * * cd /app && . {env_file} && python3 -m cron.run_stage --stage scrape >> "{DATA_DIR}/cron.log" 2>&1
 
-# Check alerts for new listings at a random daily time ({rand_hour}:{rand_min:02d})
-{rand_min} {rand_hour} * * * cd /app && . {env_file} && python3 -m alerts.check_new_listings >> "{DATA_DIR}/cron.log" 2>&1 && touch "{DATA_DIR}/.last_alert_check"
+# Recovery sweeps: 12:00, 15:00, 18:00 Europe/London (3h gaps). Re-runs any
+# stage that hasn't succeeded today, in order. Stops at the first failure
+# so we don't alert on broken upstream data, and skips stages currently
+# being run by another invocation (per-stage flock).
+0 12,15,18 * * * cd /app && . {env_file} && python3 -m cron.run_stage --recover >> "{DATA_DIR}/cron.log" 2>&1
 
-# Refresh amenities weekly on Sunday at 7am
-0 7 * * 0 cd /app && . {env_file} && python3 /app/src/fetch_amenities.py --amenities "$AMENITIES" "{listings_file}" >> "{DATA_DIR}/cron.log" 2>&1
+# Final sweep at 21:00 — same as above but allowed to fire alerts with stale
+# amenities so users still get a daily Telegram even if Overpass is down.
+# Marks any still-failing stages as "stale" for the UI to surface.
+0 21 * * * cd /app && . {env_file} && python3 -m cron.run_stage --recover --final >> "{DATA_DIR}/cron.log" 2>&1
 
 """
     cron_path = Path("/etc/cron.d/property-update")

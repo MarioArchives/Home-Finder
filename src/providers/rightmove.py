@@ -11,6 +11,11 @@ RESULTS_PER_PAGE = 50
 
 class RightmoveProvider(ListingProvider):
     name = "rightmove"
+    display_name = "Rightmove"
+    icon = "\U0001F3E1"
+    color = "#00a652"
+    bg = "rgba(0, 166, 82, 0.12)"
+    supports_buy = True
 
     def resolve_location(self, page, city: str) -> str | None | bool:
         """Use the Rightmove search bar to resolve a city to a location identifier."""

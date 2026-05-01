@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSources } from '../../shared/sources'
 import './SetupWizard.css'
 
 interface SetupWizardProps {
@@ -6,12 +7,22 @@ interface SetupWizardProps {
 }
 
 export default function SetupWizard({ onStarted }: SetupWizardProps) {
+    const sources = useSources()
     const [city, setCity] = useState('')
     const [type, setType] = useState<'rent' | 'buy'>('rent')
-    const [source, setSource] = useState<'rightmove' | 'zoopla' | 'both'>('rightmove')
+    const [source, setSource] = useState<string>('rightmove')
     const [pages, setPages] = useState(5)
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
+
+    // Hide rent-only providers when the user has selected "buy". If the
+    // currently-selected source isn't buyable, fall back to "all".
+    const visibleSources = sources.filter(s => type === 'rent' || s.supports_buy)
+    const sourceChoices: { value: string; label: string }[] = [
+        ...visibleSources.map(s => ({ value: s.name, label: s.label })),
+        { value: 'all', label: 'All' },
+    ]
+    const isSelectionValid = sourceChoices.some(c => c.value === source)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -19,6 +30,7 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
             setError('Please enter a city')
             return
         }
+        const submitSource = isSelectionValid ? source : 'all'
         setSubmitting(true)
         setError('')
 
@@ -26,7 +38,7 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
             const res = await fetch('/api/setup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ city: city.trim(), type, source, pages }),
+                body: JSON.stringify({ city: city.trim(), type, source: submitSource, pages }),
             })
             if (!res.ok) {
                 const data = await res.json()
@@ -82,15 +94,15 @@ export default function SetupWizard({ onStarted }: SetupWizardProps) {
 
                     <div className="setup-field">
                         <label>Source</label>
-                        <div className="setup-toggle three">
-                            {(['rightmove', 'zoopla', 'both'] as const).map(s => (
+                        <div className="setup-toggle">
+                            {sourceChoices.map(s => (
                                 <button
-                                    key={s}
+                                    key={s.value}
                                     type="button"
-                                    className={source === s ? 'active' : ''}
-                                    onClick={() => setSource(s)}
+                                    className={(isSelectionValid ? source : 'all') === s.value ? 'active' : ''}
+                                    onClick={() => setSource(s.value)}
                                 >
-                                    {s === 'both' ? 'Both' : s.charAt(0).toUpperCase() + s.slice(1)}
+                                    {s.label}
                                 </button>
                             ))}
                         </div>

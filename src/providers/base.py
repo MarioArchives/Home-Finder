@@ -7,9 +7,20 @@ from bs4 import BeautifulSoup
 
 
 class ListingProvider(ABC):
-    """Interface that each property listing source must implement."""
+    """Interface that each property listing source must implement.
 
-    name: str  # e.g. "rightmove", "zoopla"
+    Subclasses declare both scrape behaviour and presentation metadata so
+    the rest of the app (UI badges, setup wizard, alert filters, status
+    panels) can render a source without hardcoding any of it. Adding a new
+    source means: subclass this, register it in providers/__init__.py.
+    """
+
+    name: str  # machine slug, e.g. "rightmove"
+    display_name: str = ""  # human label, e.g. "Rightmove"
+    icon: str = "\U0001F3E0"  # short emoji shown alongside the label
+    color: str = "#6b7280"  # brand foreground colour for badges/bars
+    bg: str = "rgba(107, 114, 128, 0.12)"  # brand-tinted background
+    supports_buy: bool = True  # set False for rent-only providers
 
     @abstractmethod
     def resolve_location(self, page, city: str) -> str | None:
