@@ -62,6 +62,7 @@ Once your bot is connected (via the setup wizard), the server runs a long-poll l
 | Command | Reply |
 |---|---|
 | `/status` | Current job state (idle vs scraping/alerts/amenities running, with per-source progress %) plus the next scheduled run time for each cron job and the timestamp of the last completed scrape. |
+| `/scrape` | Triggers the full pipeline on demand — scrape → amenities → alerts — using your saved config. Replies with a confirmation, or a busy notice if a stage is already in flight. Track progress with `/status`. |
 
 The listener uses `getUpdates` long-polling against the Telegram Bot API; no inbound webhook setup is required. Update offsets persist in `data/telegram_offset.txt` so restarts don't replay old messages.
 
