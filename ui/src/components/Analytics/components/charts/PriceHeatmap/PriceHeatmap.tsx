@@ -3,7 +3,10 @@ import type { PriceHeatmapProps } from './properties';
 
 function getColor(avg: number, maxAvg: number): string {
   const ratio = avg / maxAvg;
-  if (ratio < 0.25) return '#1a1c2e';
+  // Lowest bucket is themed via CSS custom property so light and dark
+  // modes both get a readable background. Mid/high buckets are vivid
+  // hues that work on either theme without theming.
+  if (ratio < 0.25) return 'var(--heatmap-low)';
   if (ratio < 0.45) return '#7c5cfc';
   if (ratio < 0.65) return '#38bdf8';
   if (ratio < 0.85) return '#fbbf24';
@@ -38,8 +41,8 @@ export default function PriceHeatmap({ data, onDrillDown }: PriceHeatmapProps) {
                   return (
                     <td
                       key={t}
-                      className="heatmap-cell"
-                      style={{ background: cell ? getColor(cell.avg, maxAvg) : '#111', cursor: cell ? 'pointer' : undefined }}
+                      className={cell ? 'heatmap-cell' : 'heatmap-cell heatmap-cell--empty'}
+                      style={{ background: cell ? getColor(cell.avg, maxAvg) : undefined, cursor: cell ? 'pointer' : undefined }}
                       title={
                         cell
                           ? `£${cell.avg.toLocaleString()} avg (${cell.count} listings)`

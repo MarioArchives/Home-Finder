@@ -4,13 +4,19 @@
   --text-light: #6b7280;
   --bg: #f9fafb;
   --card-bg: #fff;
-  --border: #e5e7eb;
+  --border: #334155;
   --accent: #2563eb;
   --accent-light: #dbeafe;
   --green: #059669;
   --green-light: #d1fae5;
   --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+
+  /* Heatmap palette — only the empty + lowest-bucket cells need theming;
+     the mid/high buckets use vivid hues that read on both backgrounds. */
+  --heatmap-empty: #f3f4f6;
+  --heatmap-empty-text: #9ca3af;
+  --heatmap-low: #c7d2fe;
 
   font: 15px/1.5 system-ui, -apple-system, sans-serif;
   color: var(--text);
@@ -31,6 +37,10 @@
     --green-light: rgba(52,211,153,0.15);
     --shadow: 0 1px 3px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
+
+    --heatmap-empty: #1f2937;
+    --heatmap-empty-text: #6b7280;
+    --heatmap-low: #1a1c2e;
   }
 }
 

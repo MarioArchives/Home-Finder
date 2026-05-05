@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  python:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dev requirements
+        run: pip install -r requirements-dev.txt
+
+      - name: Compile-check all sources
+        run: python -m compileall -q src
+
+      - name: Run pytest
+        run: python -m pytest -v
+
+  ui:
+    name: UI tests + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - name: Build (smoke check)
+        run: |
+          # Vite needs the symlinked data files at build time.
+          rm -f public/listings.json public/amenities.json
+          echo '[]' > public/listings.json
+          echo '{"properties":{}}' > public/amenities.json
+          npm run build

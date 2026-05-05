@@ -3,6 +3,7 @@
 import re
 
 from bs4 import BeautifulSoup
+from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 
 from providers.base import ListingProvider
 
@@ -30,6 +31,8 @@ class RightmoveProvider(ListingProvider):
         search_input.first.fill(city)
         page.wait_for_timeout(1500)
 
+        # Autocomplete suggestion may not appear (e.g. exact-match query
+        # auto-resolves) — that's expected, fall through to the URL parse.
         try:
             suggestion = page.locator(
                 "#ta_searchInput_list li, ul[id*='searchInput'] li, "
@@ -38,15 +41,17 @@ class RightmoveProvider(ListingProvider):
             suggestion.first.wait_for(timeout=5000)
             suggestion.first.click()
             page.wait_for_timeout(500)
-        except Exception:
+        except (PlaywrightTimeoutError, PlaywrightError):
             pass
 
+        # Same for the submit button — pressing Enter in the input may have
+        # already navigated, so a missing button is not an error.
         try:
             page.click(
                 "button:has-text('Search'), button[type='submit'], #submit",
                 timeout=3000,
             )
-        except Exception:
+        except (PlaywrightTimeoutError, PlaywrightError):
             pass
 
         page.wait_for_timeout(3000)
@@ -311,7 +316,7 @@ class RightmoveProvider(ListingProvider):
             if image_urls:
                 extras["images"] = image_urls
 
-        except Exception as e:
-            print(f"    [{self.name}] Error fetching detail: {e}")
+        except (PlaywrightTimeoutError, PlaywrightError) as e:
+            print(f"    [{self.name}] Error fetching detail: {type(e).__name__}: {e}")
 
         return extras

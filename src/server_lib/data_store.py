@@ -1,11 +1,34 @@
 """Alerts, chats, and Telegram helpers — file-backed data store."""
 
 import json
+import os
+import tempfile
+import urllib.error
 import urllib.request
 import urllib.parse
+from pathlib import Path
 
 from . import config as cfg
 from .config import ALERTS_FILE, CHATS_FILE
+
+
+def _atomic_write_json(path: Path, payload) -> None:
+    """Write JSON via temp-file + os.replace so a crash mid-write can't
+    leave a half-written or empty file in place."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(payload, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def load_alerts() -> list[dict]:
@@ -18,7 +41,7 @@ def load_alerts() -> list[dict]:
 
 
 def save_alerts(alerts: list[dict]):
-    ALERTS_FILE.write_text(json.dumps(alerts, indent=2))
+    _atomic_write_json(ALERTS_FILE, alerts)
 
 
 def load_chats() -> list[dict]:
@@ -31,7 +54,7 @@ def load_chats() -> list[dict]:
 
 
 def save_chats(chats: list[dict]):
-    CHATS_FILE.write_text(json.dumps(chats, indent=2))
+    _atomic_write_json(CHATS_FILE, chats)
 
 
 def get_chat_ids_for_alert(alert_id: str | None = None) -> list[str]:
@@ -78,7 +101,7 @@ def send_telegram(text: str, chat_id: str | None = None,
             req = urllib.request.Request(url, data=data)
             urllib.request.urlopen(req, timeout=15)
             return
-        except Exception as e:
+        except (urllib.error.URLError, OSError, TimeoutError) as e:
             print(f"[Telegram] sendPhoto failed for {chat_id}: {e} — falling back to text")
 
     url = f"https://api.telegram.org/bot{cfg.TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -91,7 +114,7 @@ def send_telegram(text: str, chat_id: str | None = None,
     try:
         req = urllib.request.Request(url, data=data)
         urllib.request.urlopen(req, timeout=10)
-    except Exception as e:
+    except (urllib.error.URLError, OSError, TimeoutError) as e:
         print(f"[Telegram] Failed to send to {chat_id}: {e}")
 
 

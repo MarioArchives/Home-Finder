@@ -7,7 +7,13 @@ from pathlib import Path
 
 
 def _load_dotenv():
-    """Load .env file from the project root if it exists."""
+    """Load .env file from the project root if it exists.
+
+    Treats empty-string env vars (e.g. the placeholder TELEGRAM_BOT_TOKEN=""
+    set in the Dockerfile) as unset, so a real value in .env wins. Plain
+    os.environ.setdefault() would skip the assignment because the key is
+    already present.
+    """
     env_path = Path(__file__).parent.parent.parent / ".env"
     if not env_path.exists():
         return
@@ -17,7 +23,10 @@ def _load_dotenv():
             continue
         if "=" in line:
             key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
+            key = key.strip()
+            value = value.strip()
+            if not os.environ.get(key):
+                os.environ[key] = value
 
 
 _load_dotenv()

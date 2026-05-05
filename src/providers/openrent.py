@@ -192,6 +192,22 @@ class OpenRentProvider(ListingProvider):
                     m = re.match(r"([A-G])", value.upper())
                     if m:
                         extras["epc_rating"] = m.group(1)
+                elif label in ("Size", "Floor Area", "Property Size"):
+                    sz = re.search(r"([\d,]+)\s*sq\.?\s*ft", value, re.IGNORECASE)
+                    if sz:
+                        val = int(sz.group(1).replace(",", ""))
+                        if 50 <= val <= 10000:
+                            extras["size_sq_ft"] = f"{val} sq ft"
+
+            # Description fallback — OpenRent landlords often mention size
+            # only in the free-text blurb, never in the structured table.
+            if not extras["size_sq_ft"]:
+                page_text = soup.get_text(" ", strip=True)
+                sz = re.search(r"([\d,]+)\s*sq\.?\s*ft", page_text, re.IGNORECASE)
+                if sz:
+                    val = int(sz.group(1).replace(",", ""))
+                    if 50 <= val <= 10000:
+                        extras["size_sq_ft"] = f"{val} sq ft"
 
             # Bedrooms/bathrooms — refresh from the detail badges if missing.
             beds_match = re.search(

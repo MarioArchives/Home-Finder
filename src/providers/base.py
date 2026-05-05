@@ -4,6 +4,7 @@ import time
 from abc import ABC, abstractmethod
 
 from bs4 import BeautifulSoup
+from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 
 
 class ListingProvider(ABC):
@@ -47,7 +48,13 @@ class ListingProvider(ABC):
         """Visit a listing detail page and extract extra fields."""
 
     def accept_cookies(self, page):
-        """Try to dismiss cookie banners. Override if provider needs custom handling."""
+        """Try to dismiss cookie banners. Override if provider needs custom handling.
+
+        Each candidate selector may legitimately not match (different banner
+        UIs across providers / no banner at all), so PlaywrightTimeoutError
+        and Playwright's generic Error are expected control flow here, not
+        bugs to surface.
+        """
         for selector in [
             "#onetrust-accept-btn-handler",
             "button:has-text('Accept all')",
@@ -57,8 +64,8 @@ class ListingProvider(ABC):
                 page.click(selector, timeout=2000)
                 page.wait_for_timeout(500)
                 return
-            except Exception:
-                pass
+            except (PlaywrightTimeoutError, PlaywrightError):
+                continue
 
     def scrape(self, context, city: str, listing_type: str, max_pages: int) -> list[dict]:
         """Shared scrape loop — pages through search results, parses cards,

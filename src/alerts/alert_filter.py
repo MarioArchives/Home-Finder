@@ -63,18 +63,23 @@ def haversine_metres(lat1: float, lon1: float, lat2: float, lon2: float) -> floa
 
 
 def matches_alert(listing: dict, alert: dict) -> bool:
-    """Check if a listing matches an alert's criteria."""
+    """Check if a listing matches an alert's criteria.
+
+    Listings missing a value the user filtered on are treated as a *no
+    match*, not a free pass. A user who set "max £1500" did not mean "and
+    also show me anything I can't price". Same logic for beds, sqft, etc.
+    """
     price = parse_price(listing.get("price", ""))
 
     # Price
     max_price = alert.get("maxPrice")
     if max_price is not None:
-        if price is not None and price > max_price:
+        if price is None or price > max_price:
             return False
 
     min_price = alert.get("minPrice")
     if min_price is not None:
-        if price is not None and price < min_price:
+        if price is None or price < min_price:
             return False
 
     # Bedrooms
@@ -82,9 +87,11 @@ def matches_alert(listing: dict, alert: dict) -> bool:
     max_beds = alert.get("maxBedrooms")
     if min_beds is not None or max_beds is not None:
         beds = listing.get("bedrooms")
-        if min_beds is not None and (beds is not None and beds < min_beds):
+        if beds is None:
             return False
-        if max_beds is not None and (beds is not None and beds > max_beds):
+        if min_beds is not None and beds < min_beds:
+            return False
+        if max_beds is not None and beds > max_beds:
             return False
 
     # Bathrooms
