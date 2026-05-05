@@ -246,9 +246,16 @@ function Analytics({ listings, nearbyCounts = {}, onDrillDown, onSelectListing }
       .map(l => ({ lat: l.latitude!, lng: l.longitude!, price: parsePrice(l.price)!, address: l.address }))
   }, [listings])
 
-  // --- Render ---
 
   const show = (key: ChartKey) => visibleCharts.has(key)
+
+  if (listings.length === 0) {
+    return (
+      <div className="analytics">
+        <div className="no-results">No properties match your filters.</div>
+      </div>
+    )
+  }
 
   return (
     <div className="analytics">

@@ -200,7 +200,15 @@ function FitBounds({ data }: { data: PropertyPoint[] }) {
 }
 
 export default function PriceLocationHeatmap({ data }: PriceLocationHeatmapProps) {
+  // All hooks must run on every render — keep them above the empty-data
+  // early return below so React's hook ordering stays consistent. Calling
+  // hooks conditionally crashes the whole Analytics tree with "Rendered
+  // fewer hooks than expected".
   const [sigma, setSigma] = useState(SIGMA)
+  const points: PropertyPoint[] = useMemo(
+    () => data.map(d => ({ lat: d.lat, lng: d.lng, price: d.price })),
+    [data],
+  )
 
   if (data.length === 0) return (
     <ChartCard title="Price Heatmap by Location" wide>
@@ -214,11 +222,6 @@ export default function PriceLocationHeatmap({ data }: PriceLocationHeatmapProps
     data.reduce((s, d) => s + d.lat, 0) / data.length,
     data.reduce((s, d) => s + d.lng, 0) / data.length,
   ]
-
-  const points: PropertyPoint[] = useMemo(
-    () => data.map(d => ({ lat: d.lat, lng: d.lng, price: d.price })),
-    [data],
-  )
 
   return (
     <ChartCard title="Price Heatmap by Location" wide>

@@ -23,7 +23,13 @@ export default function MapView({ listings, nearbyCounts }: MapViewProps) {
   const withCoords = listings.filter((l) => l.latitude && l.longitude)
 
   if (withCoords.length === 0) {
-    return <div className="no-results">No properties with location data to display on map.</div>
+    // Distinguish "filters narrowed to zero" from "matches exist but none
+    // have coords" so the user knows whether to relax filters or accept
+    // that the matched listings simply don't publish a location.
+    const message = listings.length === 0
+      ? 'No properties match your filters.'
+      : 'No properties with location data to display on map.'
+    return <div className="no-results">{message}</div>
   }
 
   const center: [number, number] = [
