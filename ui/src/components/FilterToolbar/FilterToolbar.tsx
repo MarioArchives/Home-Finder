@@ -1,6 +1,8 @@
 import type { FilterState } from '../../types/listing'
 import DateInput from '../../shared/DateInput/DateInput'
 import { useSources } from '../../shared/sources'
+import { INITIAL_FILTERS } from '../../config/defaults'
+import { COUNCIL_TAX_BAND_ORDER, PIN_RADIUS_OPTIONS } from '../../config/constants'
 
 interface FilterOptions {
     propertyTypes: string[]
@@ -33,14 +35,6 @@ function hasActiveExtraFilters(filters: FilterState): boolean {
         filters.availableTo ||
         filters.pinRadius
     )
-}
-
-const INITIAL_FILTERS: FilterState = {
-    search: '', minPrice: '', maxPrice: '', bedrooms: '', maxBedrooms: '',
-    bathrooms: '', propertyType: '', propertyTypes: [], source: '',
-    furnishType: '', furnishTypes: [], councilTax: '', minSqFt: '', maxSqFt: '',
-    availableFrom: '', availableTo: '', excludeShares: false,
-    pinLat: '', pinLng: '', pinRadius: '',
 }
 
 export default function FilterToolbar({
@@ -193,7 +187,7 @@ export default function FilterToolbar({
                             <label>Max Council Tax</label>
                             <select value={filters.councilTax} onChange={(e) => updateFilter('councilTax', e.target.value)}>
                                 <option value="">Any</option>
-                                {'ABCDEFGH'.split('').map((b) => <option key={b} value={b}>Band {b}</option>)}
+                                {COUNCIL_TAX_BAND_ORDER.split('').map((b) => <option key={b} value={b}>Band {b}</option>)}
                             </select>
                         </div>
                         <div className="filter-group">
@@ -222,10 +216,9 @@ export default function FilterToolbar({
                                 }}
                             >
                                 <option value="">Off</option>
-                                <option value="1">Within 1 km</option>
-                                <option value="2">Within 2 km</option>
-                                <option value="5">Within 5 km</option>
-                                <option value="10">Within 10 km</option>
+                                {PIN_RADIUS_OPTIONS.map(o => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
                             </select>
                         </div>
                     </div>

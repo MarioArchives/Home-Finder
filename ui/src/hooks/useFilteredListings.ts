@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { parsePrice, parseSqFt, parseAvailableDate, haversineMetres } from '../shared/utils/utils'
+import { COUNCIL_TAX_BAND_ORDER } from '../config/constants'
 import type { Listing, NearbyData, FilterState } from '../types/listing'
 
 const SHARE_KEYWORDS = ['house share', 'flat share', 'room share', 'shared house', 'shared flat', 'room in a', 'room to rent', 'double room', 'single room', 'en-suite room', 'room available']
@@ -112,10 +113,9 @@ export function useFilteredListings({
             }
             if (filters.councilTax) {
                 if (!l.council_tax) return false
-                const bandOrder = 'ABCDEFGH'
-                const maxIdx = bandOrder.indexOf(filters.councilTax)
+                const maxIdx = COUNCIL_TAX_BAND_ORDER.indexOf(filters.councilTax)
                 const match = l.council_tax.match(/Band\s+([A-H])/i)
-                if (!match || bandOrder.indexOf(match[1].toUpperCase()) > maxIdx) return false
+                if (!match || COUNCIL_TAX_BAND_ORDER.indexOf(match[1].toUpperCase()) > maxIdx) return false
             }
             if (filters.minSqFt || filters.maxSqFt) {
                 const sqft = parseSqFt(l.size_sq_ft)
