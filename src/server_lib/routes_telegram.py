@@ -1,9 +1,12 @@
-"""Route handlers for /api/telegram/* and /api/chats endpoints."""
+"""Pure handlers for /api/telegram/* and /api/chats — wired into FastAPI in app.py."""
 
 import json
 import os
-import urllib.request
+import urllib.error
 import urllib.parse
+import urllib.request
+
+from fastapi import HTTPException
 
 from .config import DATA_DIR
 from .data_store import load_chats, save_chats
@@ -11,42 +14,41 @@ from .data_store import load_chats, save_chats
 from . import config as cfg
 
 
-def handle_telegram_status(handler):
+def telegram_status_payload() -> dict:
     chats = load_chats()
-    handler._json_response(200, {
+    return {
         "configured": bool(cfg.TELEGRAM_BOT_TOKEN and (cfg.TELEGRAM_CHAT_ID or chats)),
         "has_bot_token": bool(cfg.TELEGRAM_BOT_TOKEN),
         "has_chat_id": bool(cfg.TELEGRAM_CHAT_ID or chats),
-    })
+    }
 
 
-def handle_chats_get(handler):
-    handler._json_response(200, load_chats())
+def list_chats() -> list[dict]:
+    return load_chats()
 
 
-def handle_telegram_setup(handler, body):
-    bot_token = body.get("bot_token", "").strip()
-    chat_id = body.get("chat_id", "").strip()
-    chat_name = body.get("chat_name", "").strip() or "Owner"
+def configure_telegram(bot_token: str, chat_id: str, chat_name: str) -> dict:
+    bot_token = bot_token.strip()
+    chat_id = chat_id.strip()
+    chat_name = chat_name.strip() or "Owner"
 
     if not bot_token:
-        handler._json_response(400, {"error": "Bot token is required"})
-        return
+        raise HTTPException(status_code=400, detail="Bot token is required")
 
-    # Validate bot token
+    # Validate bot token via getMe
     try:
         url = f"https://api.telegram.org/bot{bot_token}/getMe"
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=30) as resp:
             me = json.loads(resp.read().decode())
         if not me.get("ok"):
-            handler._json_response(400, {"error": "Invalid bot token"})
-            return
+            raise HTTPException(status_code=400, detail="Invalid bot token")
         bot_name = me.get("result", {}).get("username", "unknown")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[telegram] getMe failed: {type(e).__name__}: {e}", flush=True)
-        handler._json_response(400, {"error": f"Could not validate bot token: {e}"})
-        return
+        raise HTTPException(status_code=400, detail=f"Could not validate bot token: {e}")
 
     # Test message if chat_id provided
     if chat_id:
@@ -60,14 +62,17 @@ def handle_telegram_setup(handler, body):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 result = json.loads(resp.read().decode())
             if not result.get("ok"):
-                handler._json_response(400, {"error": "Could not send message to that chat ID. Make sure you've messaged the bot first."})
-                return
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not send message to that chat ID. Make sure you've messaged the bot first.",
+                )
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[telegram] sendMessage failed: {type(e).__name__}: {e}", flush=True)
-            handler._json_response(400, {"error": f"Could not reach chat: {e}"})
-            return
+            raise HTTPException(status_code=400, detail=f"Could not reach chat: {e}")
 
-    # Save credentials
+    # Save credentials to module globals + os.environ + .env.telegram
     cfg.TELEGRAM_BOT_TOKEN = bot_token
     cfg.TELEGRAM_CHAT_ID = chat_id
     os.environ["TELEGRAM_BOT_TOKEN"] = bot_token
@@ -82,8 +87,8 @@ def handle_telegram_setup(handler, body):
             chats.append({"chat_id": chat_id, "name": chat_name, "alert_ids": None})
             save_chats(chats)
 
-    # Update .env.cron (lines use `export VAR=value` so cron's /bin/sh
-    # actually passes them to the Python subprocess).
+    # Update .env.cron — lines use `export VAR=value` so cron's /bin/sh
+    # actually passes them to the Python subprocess.
     cron_env = DATA_DIR / ".env.cron"
     if cron_env.exists():
         lines = cron_env.read_text().splitlines()
@@ -96,7 +101,7 @@ def handle_telegram_setup(handler, body):
         new_lines.append(f"export TELEGRAM_CHAT_ID={chat_id}")
         cron_env.write_text("\n".join(new_lines) + "\n")
 
-    handler._json_response(200, {"ok": True, "bot_name": bot_name})
+    return {"ok": True, "bot_name": bot_name}
 
 
 # Every Telegram Update carries a `chat` reference under ONE of these keys.
@@ -118,18 +123,16 @@ def _chat_from_update(update: dict) -> dict | None:
     return None
 
 
-def handle_discover_chats(handler):
+def discover_chats() -> dict:
     if not cfg.TELEGRAM_BOT_TOKEN:
-        handler._json_response(400, {"error": "Bot token not configured yet"})
-        return
+        raise HTTPException(status_code=400, detail="Bot token not configured yet")
     try:
         url = f"https://api.telegram.org/bot{cfg.TELEGRAM_BOT_TOKEN}/getUpdates"
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode())
         if not data.get("ok"):
-            handler._json_response(500, {"error": "Failed to fetch updates from Telegram"})
-            return
+            raise HTTPException(status_code=500, detail="Failed to fetch updates from Telegram")
 
         # Walk every update and collect unique chats. We used to only look at
         # `update.message`, which meant edited messages and Start-button
@@ -151,30 +154,27 @@ def handle_discover_chats(handler):
 
         # Mark chats that are already saved instead of silently hiding them.
         # Previously this filter discarded already-registered chats, so a
-        # returning user who messaged the bot would see "No new chats found"
-        # forever — the chat existed in the Telegram queue but the handler
-        # suppressed it.
+        # returning user would see "No new chats found" forever.
         existing = {c["chat_id"] for c in load_chats()}
         chats = sorted(seen.values(), key=lambda c: c["chat_id"])
         for c in chats:
             c["already_registered"] = c["chat_id"] in existing
-
-        handler._json_response(200, {"chats": chats})
+        return {"chats": chats}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[telegram] discover-chats failed: {type(e).__name__}: {e}", flush=True)
-        handler._json_response(500, {"error": f"Failed to discover chats: {e}"})
+        raise HTTPException(status_code=500, detail=f"Failed to discover chats: {e}")
 
 
-def handle_add_chat(handler, body):
-    chat_id = str(body.get("chat_id", "")).strip()
-    chat_name = body.get("name", "").strip() or chat_id
+def add_chat(chat_id: str, name: str) -> dict:
+    chat_id = str(chat_id).strip()
+    name = name.strip() or chat_id
     if not chat_id:
-        handler._json_response(400, {"error": "chat_id is required"})
-        return
+        raise HTTPException(status_code=400, detail="chat_id is required")
     chats = load_chats()
     if any(c["chat_id"] == chat_id for c in chats):
-        handler._json_response(409, {"error": "Chat already exists"})
-        return
-    chats.append({"chat_id": chat_id, "name": chat_name, "alert_ids": None})
+        raise HTTPException(status_code=409, detail="Chat already exists")
+    chats.append({"chat_id": chat_id, "name": name, "alert_ids": None})
     save_chats(chats)
-    handler._json_response(201, {"ok": True})
+    return {"ok": True}

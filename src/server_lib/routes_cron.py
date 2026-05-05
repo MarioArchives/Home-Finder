@@ -321,10 +321,10 @@ def next_runs() -> list[dict]:
     return results
 
 
-def handle_cron_status(handler):
+def cron_status_payload() -> dict:
     job = _running_job()
     status = load_status()
-    payload = {
+    return {
         "running": bool(job),
         "job": job,
         "last_scrape": _last_scrape_mtime(),
@@ -333,4 +333,3 @@ def handle_cron_status(handler):
         "status_summary": summary_line(status),
         **_scrape_progress(job),
     }
-    handler._json_response(200, payload)

@@ -1,9 +1,11 @@
-"""Route handlers for /api/setup and /api/status endpoints."""
+"""Pure handlers for /api/setup and /api/status — wired into FastAPI in app.py."""
 
+import asyncio
 import copy
 import json
 import threading
-import time
+
+from fastapi import HTTPException
 
 from .config import setup_state, setup_preferences, setup_lock, get_status, get_config
 from .setup import run_setup
@@ -17,10 +19,10 @@ from . import config as cfg
 from providers import valid_source_values, list_provider_meta
 
 
-def handle_status(handler):
+def status_payload() -> dict:
     status = get_status()
     chats = load_chats()
-    body = {
+    body: dict = {
         "status": status,
         "telegram_configured": bool(cfg.TELEGRAM_BOT_TOKEN and (cfg.TELEGRAM_CHAT_ID or chats)),
     }
@@ -29,30 +31,24 @@ def handle_status(handler):
             body["progress"] = copy.deepcopy(setup_state["progress"])
     elif status == "ready":
         body["config"] = get_config()
-    handler._json_response(200, body)
+    return body
 
 
-def handle_setup_post(handler, body):
+def start_setup(city: str, listing_type: str, source: str, pages: int) -> dict:
     with setup_lock:
         if setup_state["phase"] in ("scraping", "amenities"):
-            handler._json_response(409, {"error": "Setup already in progress"})
-            return
-
-    city = body.get("city", "").strip()
-    listing_type = body.get("type", "rent")
-    source = body.get("source", "rightmove")
-    pages = int(body.get("pages", 5))
+            raise HTTPException(status_code=409, detail="Setup already in progress")
 
     if not city:
-        handler._json_response(400, {"error": "City is required"})
-        return
+        raise HTTPException(status_code=400, detail="City is required")
     if listing_type not in ("rent", "buy"):
-        handler._json_response(400, {"error": "Type must be 'rent' or 'buy'"})
-        return
+        raise HTTPException(status_code=400, detail="Type must be 'rent' or 'buy'")
     if source not in valid_source_values():
         allowed = sorted(valid_source_values())
-        handler._json_response(400, {"error": f"Source must be one of: {', '.join(allowed)}"})
-        return
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source must be one of: {', '.join(allowed)}",
+        )
 
     with setup_lock:
         setup_preferences["amenities"] = "climbing"
@@ -65,55 +61,48 @@ def handle_setup_post(handler, body):
         daemon=True,
     )
     thread.start()
-    handler._json_response(201, {"ok": True})
+    return {"ok": True}
 
 
-def handle_setup_preferences(handler, body):
+def submit_preferences(amenities: str, pin_data) -> dict:
     with setup_lock:
         if setup_state["phase"] not in ("scraping", "amenities"):
-            handler._json_response(409, {"error": "No setup in progress"})
-            return
-
-    amenities = body.get("amenities", "climbing")
-    pin_data = body.get("pin_data")
-
-    with setup_lock:
+            raise HTTPException(status_code=409, detail="No setup in progress")
         setup_preferences["amenities"] = amenities
         setup_preferences["pin_data"] = pin_data
         setup_preferences["submitted"] = True
-
-    handler._json_response(200, {"ok": True})
-
-
-def handle_sources(handler):
-    """Return the live registry of listing providers + UI metadata."""
-    handler._json_response(200, {"sources": list_provider_meta()})
+    return {"ok": True}
 
 
-def handle_setup_progress(handler):
-    handler.send_response(200)
-    handler.send_header("Content-Type", "text/event-stream")
-    handler.send_header("Cache-Control", "no-cache")
-    handler.send_header("Connection", "keep-alive")
-    handler.send_header("X-Accel-Buffering", "no")
-    handler.end_headers()
+def list_sources() -> dict:
+    """Live registry of listing providers + UI metadata."""
+    return {"sources": list_provider_meta()}
+
+
+def _snapshot_setup_state() -> dict:
+    with setup_lock:
+        return {
+            "phase": setup_state["phase"],
+            "error": setup_state.get("error"),
+            "preferences_submitted": setup_preferences["submitted"],
+            **copy.deepcopy(setup_state["progress"]),
+        }
+
+
+async def setup_progress_events():
+    """Async generator for SSE — yields {"data": json} on every state change.
+
+    Terminates when the setup phase reaches a terminal state (complete/error)
+    or is cleared. sse-starlette serialises each yielded dict into a proper
+    `event: ...\\ndata: ...\\n\\n` frame.
+    """
     last_sent = None
-    try:
-        while True:
-            with setup_lock:
-                snapshot = {
-                    "phase": setup_state["phase"],
-                    "error": setup_state.get("error"),
-                    "preferences_submitted": setup_preferences["submitted"],
-                    **copy.deepcopy(setup_state["progress"]),
-                }
-            current = json.dumps(snapshot)
-            if current != last_sent:
-                handler.wfile.write(f"data: {current}\n\n".encode())
-                handler.wfile.flush()
-                last_sent = current
-            if snapshot["phase"] in ("complete", "error", None):
-                break
-            time.sleep(1)
-    except (BrokenPipeError, ConnectionResetError):
-        pass
+    while True:
+        snapshot = _snapshot_setup_state()
+        payload = json.dumps(snapshot)
+        if payload != last_sent:
+            yield {"data": payload}
+            last_sent = payload
+        if snapshot["phase"] in ("complete", "error", None):
+            break
+        await asyncio.sleep(1)
