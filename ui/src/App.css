@@ -72,7 +72,7 @@
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 22px 22px;
+  padding: 23px 35px;
   margin-bottom: 10px;
   box-shadow: var(--shadow);
 }
@@ -96,8 +96,15 @@
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .filter-group {
@@ -873,28 +880,35 @@
     padding: 12px 14px 0;
     margin: -14px -14px 20px;
   }
+
   .toolbar-top {
     flex-direction: column;
     align-items: flex-start;
   }
+
   .filters {
     padding: 12px;
   }
+
   .filter-row {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
+
   .filter-group.search {
     grid-column: 1 / -1;
   }
+
   .filter-group.filter-group-wide {
     grid-column: 1 / -1;
   }
+
   .sort-bar {
     flex-direction: column;
     gap: 8px;
     align-items: stretch;
   }
+
   .sort-bar-right {
     justify-content: space-between;
   }
@@ -904,6 +918,7 @@
   .filter-row {
     grid-template-columns: 1fr;
   }
+
   .filter-group.search {
     grid-column: 1;
   }

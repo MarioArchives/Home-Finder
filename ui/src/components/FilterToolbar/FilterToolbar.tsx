@@ -5,233 +5,233 @@ import { INITIAL_FILTERS } from '../../config/defaults'
 import { COUNCIL_TAX_BAND_ORDER, PIN_RADIUS_OPTIONS } from '../../config/constants'
 
 interface FilterOptions {
-    propertyTypes: string[]
-    sources: string[]
-    furnishTypes: string[]
-    bedroomCounts: number[]
-    bathroomCounts: number[]
+  propertyTypes: string[]
+  sources: string[]
+  furnishTypes: string[]
+  bedroomCounts: number[]
+  bathroomCounts: number[]
 }
 
 interface FilterToolbarProps {
-    filters: FilterState
-    setFilters: React.Dispatch<React.SetStateAction<FilterState>>
-    options: FilterOptions
-    showMoreFilters: boolean
-    setShowMoreFilters: (v: boolean) => void
-    onSearchChange: (value: string) => void
-    onShowPinPopup: () => void
+  filters: FilterState
+  setFilters: React.Dispatch<React.SetStateAction<FilterState>>
+  options: FilterOptions
+  showMoreFilters: boolean
+  setShowMoreFilters: (v: boolean) => void
+  onSearchChange: (value: string) => void
+  onShowPinPopup: () => void
 }
 
 function hasActiveExtraFilters(filters: FilterState): boolean {
-    return !!(
-        filters.bathrooms ||
-        filters.source ||
-        filters.furnishType ||
-        filters.furnishTypes.length > 0 ||
-        filters.councilTax ||
-        filters.minSqFt ||
-        filters.maxSqFt ||
-        filters.availableFrom ||
-        filters.availableTo ||
-        filters.pinRadius
-    )
+  return !!(
+    filters.bathrooms ||
+    filters.source ||
+    filters.furnishType ||
+    filters.furnishTypes.length > 0 ||
+    filters.councilTax ||
+    filters.minSqFt ||
+    filters.maxSqFt ||
+    filters.availableFrom ||
+    filters.availableTo ||
+    filters.pinRadius
+  )
 }
 
 export default function FilterToolbar({
-    filters, setFilters, options, showMoreFilters, setShowMoreFilters, onShowPinPopup,
+  filters, setFilters, options, showMoreFilters, setShowMoreFilters, onShowPinPopup,
 }: FilterToolbarProps) {
-    const allSources = useSources()
-    const updateFilter = (key: keyof FilterState, value: string) =>
-        setFilters((prev) => ({ ...prev, [key]: value }))
+  const allSources = useSources()
+  const updateFilter = (key: keyof FilterState, value: string) =>
+    setFilters((prev) => ({ ...prev, [key]: value }))
 
-    const extraFilterCount = [
-        filters.bathrooms, filters.source, filters.councilTax,
-        filters.minSqFt, filters.maxSqFt, filters.availableFrom, filters.availableTo, filters.pinRadius,
-    ].filter(Boolean).length + (filters.furnishTypes.length > 0 ? 1 : 0)
+  const extraFilterCount = [
+    filters.bathrooms, filters.source, filters.councilTax,
+    filters.minSqFt, filters.maxSqFt, filters.availableFrom, filters.availableTo, filters.pinRadius,
+  ].filter(Boolean).length + (filters.furnishTypes.length > 0 ? 1 : 0)
 
-    return (
-        <>
-            <div className="filters">
-                <div className="filter-row primary-filters">
-                    <div className="filter-group">
-                        <label>Min price</label>
-                        <input type="number" placeholder="e.g. 800" value={filters.minPrice} onChange={(e) => updateFilter('minPrice', e.target.value)} />
-                    </div>
-                    <div className="filter-group">
-                        <label>Max price</label>
-                        <input type="number" placeholder="e.g. 1500" value={filters.maxPrice} onChange={(e) => updateFilter('maxPrice', e.target.value)} />
-                    </div>
-                    <div className="filter-group">
-                        <label>Min beds</label>
-                        <select value={filters.bedrooms} onChange={(e) => updateFilter('bedrooms', e.target.value)}>
-                            <option value="">Any</option>
-                            {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}+</option>)}
-                        </select>
-                    </div>
-                    <div className="filter-group">
-                        <label>Max beds</label>
-                        <select value={filters.maxBedrooms} onChange={(e) => updateFilter('maxBedrooms', e.target.value)}>
-                            <option value="">Any</option>
-                            {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}</option>)}
-                        </select>
-                    </div>
-                    <div className="filter-group">
-                        <label>Property type</label>
-                        <div className="multi-select" tabIndex={0}>
-                            <div className="multi-select-display">
-                                {filters.propertyTypes.length === 0
-                                    ? 'Any'
-                                    : filters.propertyTypes.length === 1
-                                        ? filters.propertyTypes[0]
-                                        : `${filters.propertyTypes.length} selected`}
-                            </div>
-                            <div className="multi-select-dropdown">
-                                <button
-                                    className="multi-select-clear"
-                                    onClick={() => setFilters(prev => ({ ...prev, propertyTypes: [] }))}
-                                >
-                                    Clear all
-                                </button>
-                                {options.propertyTypes.map((t) => (
-                                    <label key={t} className="multi-select-option">
-                                        <input
-                                            type="checkbox"
-                                            checked={filters.propertyTypes.includes(t)}
-                                            onChange={(e) => {
-                                                const next = e.target.checked
-                                                    ? [...filters.propertyTypes, t]
-                                                    : filters.propertyTypes.filter((x) => x !== t)
-                                                setFilters((prev) => ({ ...prev, propertyTypes: next }))
-                                            }}
-                                        />
-                                        {t}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="filter-group">
-                        <label className="checkbox-label standalone">
-                            <input
-                                type="checkbox"
-                                checked={filters.excludeShares}
-                                onChange={(e) => setFilters((prev) => ({ ...prev, excludeShares: e.target.checked }))}
-                            />
-                            Exclude shares
-                        </label>
-                    </div>
-                    <div className="filter-group filter-actions-group">
-                        <button
-                            className={`btn-more-filters ${showMoreFilters ? 'open' : ''} ${hasActiveExtraFilters(filters) ? 'has-active' : ''}`}
-                            onClick={() => setShowMoreFilters(!showMoreFilters)}
-                        >
-                            More filters{extraFilterCount > 0 && ` (${extraFilterCount})`}
-                            <span className="chevron">{showMoreFilters ? '\u25B2' : '\u25BC'}</span>
-                        </button>
-                        <button className="btn-clear" onClick={() => { setFilters(INITIAL_FILTERS); setShowMoreFilters(false) }}>Clear</button>
-                    </div>
-                </div>
-
-                {showMoreFilters && (
-                    <div className="filter-row extra-filters">
-                        <div className="filter-group">
-                            <label>Min baths</label>
-                            <select value={filters.bathrooms} onChange={(e) => updateFilter('bathrooms', e.target.value)}>
-                                <option value="">Any</option>
-                                {options.bathroomCounts.map((n) => <option key={n} value={n}>{n}+</option>)}
-                            </select>
-                        </div>
-                        <div className="filter-group">
-                            <label>Source</label>
-                            <select value={filters.source} onChange={(e) => updateFilter('source', e.target.value)}>
-                                <option value="">Any</option>
-                                {allSources.map((s) => <option key={s.name} value={s.name}>{s.label}</option>)}
-                            </select>
-                        </div>
-                        <div className="filter-group">
-                            <label>Furnishing</label>
-                            <div className="multi-select" tabIndex={0}>
-                                <div className="multi-select-display">
-                                    {filters.furnishTypes.length === 0
-                                        ? 'Any'
-                                        : filters.furnishTypes.length === 1
-                                            ? filters.furnishTypes[0]
-                                            : `${filters.furnishTypes.length} selected`}
-                                </div>
-                                <div className="multi-select-dropdown">
-                                    <button
-                                        className="multi-select-clear"
-                                        onClick={() => setFilters(prev => ({ ...prev, furnishTypes: [] }))}
-                                    >
-                                        Clear all
-                                    </button>
-                                    {options.furnishTypes.map((f) => (
-                                        <label key={f} className="multi-select-option">
-                                            <input
-                                                type="checkbox"
-                                                checked={filters.furnishTypes.includes(f)}
-                                                onChange={(e) => {
-                                                    const next = e.target.checked
-                                                        ? [...filters.furnishTypes, f]
-                                                        : filters.furnishTypes.filter((x) => x !== f)
-                                                    setFilters((prev) => ({ ...prev, furnishTypes: next }))
-                                                }}
-                                            />
-                                            {f}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="filter-group">
-                            <label>Max Council Tax</label>
-                            <select value={filters.councilTax} onChange={(e) => updateFilter('councilTax', e.target.value)}>
-                                <option value="">Any</option>
-                                {COUNCIL_TAX_BAND_ORDER.split('').map((b) => <option key={b} value={b}>Band {b}</option>)}
-                            </select>
-                        </div>
-                        <div className="filter-group">
-                            <label>Min sq ft</label>
-                            <input type="number" placeholder="e.g. 400" value={filters.minSqFt} onChange={(e) => updateFilter('minSqFt', e.target.value)} />
-                        </div>
-                        <div className="filter-group">
-                            <label>Max sq ft</label>
-                            <input type="number" placeholder="e.g. 1000" value={filters.maxSqFt} onChange={(e) => updateFilter('maxSqFt', e.target.value)} />
-                        </div>
-                        <div className="filter-group">
-                            <label>Available from</label>
-                            <DateInput value={filters.availableFrom} onChange={v => updateFilter('availableFrom', v)} />
-                        </div>
-                        <div className="filter-group">
-                            <label>Available to</label>
-                            <DateInput value={filters.availableTo} onChange={v => updateFilter('availableTo', v)} />
-                        </div>
-                        <div className="filter-group">
-                            <label>Distance from pin</label>
-                            <select
-                                value={filters.pinRadius}
-                                onChange={(e) => {
-                                    updateFilter('pinRadius', e.target.value)
-                                    if (e.target.value) onShowPinPopup()
-                                }}
-                            >
-                                <option value="">Off</option>
-                                {PIN_RADIUS_OPTIONS.map(o => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                )}
+  return (
+    <>
+      <div className="filters">
+        <div className="filter-row primary-filters">
+          <div className="filter-group">
+            <label>Min price</label>
+            <input type="number" placeholder="e.g. 800" value={filters.minPrice} onChange={(e) => updateFilter('minPrice', e.target.value)} />
+          </div>
+          <div className="filter-group">
+            <label>Max price</label>
+            <input type="number" placeholder="e.g. 1500" value={filters.maxPrice} onChange={(e) => updateFilter('maxPrice', e.target.value)} />
+          </div>
+          <div className="filter-group">
+            <label>Min beds</label>
+            <select value={filters.bedrooms} onChange={(e) => updateFilter('bedrooms', e.target.value)}>
+              <option value="">Any</option>
+              {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}+</option>)}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>Max beds</label>
+            <select value={filters.maxBedrooms} onChange={(e) => updateFilter('maxBedrooms', e.target.value)}>
+              <option value="">Any</option>
+              {options.bedroomCounts.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>Property type</label>
+            <div className="multi-select" tabIndex={0}>
+              <div className="multi-select-display">
+                {filters.propertyTypes.length === 0
+                  ? 'Any'
+                  : filters.propertyTypes.length === 1
+                    ? filters.propertyTypes[0]
+                    : `${filters.propertyTypes.length} selected`}
+              </div>
+              <div className="multi-select-dropdown">
+                <button
+                  className="multi-select-clear"
+                  onClick={() => setFilters(prev => ({ ...prev, propertyTypes: [] }))}
+                >
+                  Clear all
+                </button>
+                {options.propertyTypes.map((t) => (
+                  <label key={t} className="multi-select-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.propertyTypes.includes(t)}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...filters.propertyTypes, t]
+                          : filters.propertyTypes.filter((x) => x !== t)
+                        setFilters((prev) => ({ ...prev, propertyTypes: next }))
+                      }}
+                    />
+                    {t}
+                  </label>
+                ))}
+              </div>
             </div>
+          </div>
+          <div className="filter-group">
+            <label className="checkbox-label standalone">
+              <input
+                type="checkbox"
+                checked={filters.excludeShares}
+                onChange={(e) => setFilters((prev) => ({ ...prev, excludeShares: e.target.checked }))}
+              />
+              Exclude shares
+            </label>
+          </div>
+          <div className="filter-group filter-actions-group">
+            <button
+              className={`btn-more-filters ${showMoreFilters ? 'open' : ''} ${hasActiveExtraFilters(filters) ? 'has-active' : ''}`}
+              onClick={() => setShowMoreFilters(!showMoreFilters)}
+            >
+              More filters{extraFilterCount > 0 && ` (${extraFilterCount})`}
+              <span className="chevron">{showMoreFilters ? '\u25B2' : '\u25BC'}</span>
+            </button>
+            <button className="btn-clear" onClick={() => { setFilters(INITIAL_FILTERS); setShowMoreFilters(false) }}>Clear</button>
+          </div>
+        </div>
 
-            {filters.pinLat && filters.pinLng && (
-                <div className="pin-active-bar">
-                    <span>Pin: {parseFloat(filters.pinLat).toFixed(4)}, {parseFloat(filters.pinLng).toFixed(4)} — {filters.pinRadius}km radius</span>
-                    <button className="pin-change-btn" onClick={onShowPinPopup}>Change</button>
-                    <button className="pin-change-btn" onClick={() => setFilters(prev => ({ ...prev, pinLat: '', pinLng: '', pinRadius: '' }))}>Remove</button>
+        {showMoreFilters && (
+          <div className="filter-row extra-filters">
+            <div className="filter-group">
+              <label>Min baths</label>
+              <select value={filters.bathrooms} onChange={(e) => updateFilter('bathrooms', e.target.value)}>
+                <option value="">Any</option>
+                {options.bathroomCounts.map((n) => <option key={n} value={n}>{n}+</option>)}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label>Source</label>
+              <select value={filters.source} onChange={(e) => updateFilter('source', e.target.value)}>
+                <option value="">Any</option>
+                {allSources.map((s) => <option key={s.name} value={s.name}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label>Furnishing</label>
+              <div className="multi-select" tabIndex={0}>
+                <div className="multi-select-display">
+                  {filters.furnishTypes.length === 0
+                    ? 'Any'
+                    : filters.furnishTypes.length === 1
+                      ? filters.furnishTypes[0]
+                      : `${filters.furnishTypes.length} selected`}
                 </div>
-            )}
-        </>
-    )
+                <div className="multi-select-dropdown">
+                  <button
+                    className="multi-select-clear"
+                    onClick={() => setFilters(prev => ({ ...prev, furnishTypes: [] }))}
+                  >
+                    Clear all
+                  </button>
+                  {options.furnishTypes.map((f) => (
+                    <label key={f} className="multi-select-option">
+                      <input
+                        type="checkbox"
+                        checked={filters.furnishTypes.includes(f)}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...filters.furnishTypes, f]
+                            : filters.furnishTypes.filter((x) => x !== f)
+                          setFilters((prev) => ({ ...prev, furnishTypes: next }))
+                        }}
+                      />
+                      {f}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="filter-group">
+              <label>Max Council Tax</label>
+              <select value={filters.councilTax} onChange={(e) => updateFilter('councilTax', e.target.value)}>
+                <option value="">Any</option>
+                {COUNCIL_TAX_BAND_ORDER.split('').map((b) => <option key={b} value={b}>Band {b}</option>)}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label>Min sq ft</label>
+              <input type="number" placeholder="e.g. 400" value={filters.minSqFt} onChange={(e) => updateFilter('minSqFt', e.target.value)} />
+            </div>
+            <div className="filter-group">
+              <label>Max sq ft</label>
+              <input type="number" placeholder="e.g. 1000" value={filters.maxSqFt} onChange={(e) => updateFilter('maxSqFt', e.target.value)} />
+            </div>
+            <div className="filter-group">
+              <label>Available from</label>
+              <DateInput value={filters.availableFrom} onChange={v => updateFilter('availableFrom', v)} />
+            </div>
+            <div className="filter-group">
+              <label>Available to</label>
+              <DateInput value={filters.availableTo} onChange={v => updateFilter('availableTo', v)} />
+            </div>
+            <div className="filter-group">
+              <label>Distance from pin</label>
+              <select
+                value={filters.pinRadius}
+                onChange={(e) => {
+                  updateFilter('pinRadius', e.target.value)
+                  if (e.target.value) onShowPinPopup()
+                }}
+              >
+                <option value="">Off</option>
+                {PIN_RADIUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {filters.pinLat && filters.pinLng && (
+        <div className="pin-active-bar">
+          <span>Pin: {parseFloat(filters.pinLat).toFixed(4)}, {parseFloat(filters.pinLng).toFixed(4)} — {filters.pinRadius}km radius</span>
+          <button className="pin-change-btn" onClick={onShowPinPopup}>Change</button>
+          <button className="pin-change-btn" onClick={() => setFilters(prev => ({ ...prev, pinLat: '', pinLng: '', pinRadius: '' }))}>Remove</button>
+        </div>
+      )}
+    </>
+  )
 }
