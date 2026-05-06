@@ -1,6 +1,6 @@
-# Property Listings Viewer
+# Home Finder
 
-A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings from Rightmove and/or Zoopla, merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
+A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings from Rightmove, OpenRent and/or Zoopla, merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
 
 ## Quick Start (Docker)
 
