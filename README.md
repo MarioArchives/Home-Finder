@@ -1,6 +1,6 @@
 # Home Finder
 
-A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings from Rightmove, OpenRent and/or Zoopla, merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
+A self-contained property scraper and viewer that overcomes Rightmove/Zoopla/OpenRent's limited filtering. Scrapes listings from Rightmove, Zoopla, and OpenRent (any combination), merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
 ### Light and Dark mode support
 
 <table>
@@ -44,8 +44,8 @@ Then open **http://localhost:8080** — a **guided setup wizard** takes over fro
 
 On first launch the UI walks you through:
 
-1. **Search settings** — city, rent/buy, which site(s) to scrape (Rightmove, Zoopla, or both), and pages per source.
-2. **Scraping progress** — a live view of per-source pages and listings as the scraper works. When you pick both sources, they scrape in parallel.
+1. **Search settings** — city, rent/buy, which site(s) to scrape (any combination of Rightmove, Zoopla, and OpenRent — note OpenRent is rentals only), and pages per source.
+2. **Scraping progress** — a live view of per-source pages and listings as the scraper works. When you pick more than one source, they scrape in parallel.
 3. **Amenity preferences** — which optional nearby amenities to look up (climbing gyms, cinemas, gyms, parks), and an optional location pin to track commute distance per property.
 4. **Connect Telegram** (optional) — a dedicated step to hook up a Telegram bot for new-listing alerts. Has a **Skip for now** button; you can configure it later from the UI.
 
@@ -61,25 +61,29 @@ The container starts fast and:
 
 ## How it works
 
-1. **Scrape** — Playwright + Chromium scrapes Rightmove and/or Zoopla. When both are selected they run concurrently, roughly halving wall-clock time. Zoopla's Cloudflare challenges detail pages after a search session, so each detail page is fetched in a fresh browser context to slip past the fingerprint check.
-2. **Dedup** — the same property often appears on both sites. A composite key of `(normalised description, bedrooms, monthly price)` merges duplicates; the richer listing wins and the companion URL is kept on an `alt_urls` field.
+1. **Scrape** — Playwright + Chromium scrapes Rightmove, Zoopla, and/or OpenRent. When more than one is selected they run concurrently, roughly dividing wall-clock time by the number of sources. Zoopla's Cloudflare challenges detail pages after a search session, so each detail page is fetched in a fresh browser context to slip past the fingerprint check.
+2. **Dedup** — the same property often appears on multiple sites. A composite key of `(normalised description, bedrooms, monthly price)` merges duplicates across all sources; the richer listing wins and the companion URLs are kept on an `alt_urls` field.
 3. **Enrich** — for each property with coordinates, OpenStreetMap's Overpass API returns counts of nearby bars/cafes/shops within 1km plus the closest climbing gym, cinema, gym, or park.
 
 ## Scheduled Jobs
 
+All times are Europe/London (the container honours `TZ`, so BST/GMT switches automatically).
+
 | Schedule | Task |
 |---|---|
-| Daily 6am | Re-scrape all listings |
-| Daily (random time) | Check alerts for new listings, send Telegram notifications |
-| Weekly Sunday 7am | Refresh amenities data |
+| Daily 09:MM (random minute, 09:00–09:59) | **Primary chain**: scrape → amenities → alerts. Each stage triggers the next on success, with its own marker file so failures can be recovered independently. |
+| Daily 12:00 / 15:00 / 18:00 | **Recovery sweeps**: re-run any stage that hasn't succeeded today (in order). Stops at the first failure so we don't alert on broken upstream data. |
+| Daily 21:00 | **Final sweep**: same as recovery, but allowed to fire alerts with stale amenities so you still get a Telegram even if Overpass is down. |
 
-If the container was off when a job was due, the entrypoint runs a **catch-up** for any job whose last run is older than its normal interval.
+The chain runs daily — amenities are refreshed every day as part of the scrape pipeline (not weekly).
+
+If the container was off when the primary chain was due, the entrypoint runs a **catch-up** so any unfinished stage for today still runs at boot.
 
 You can query the next scheduled run time at any moment by sending `/status` to your Telegram bot or by calling `GET /api/cron/status` directly.
 
 ## Alerts
 
-The UI has an **Alerts** tab where you define criteria (max price, min bedrooms, council tax bands, property types, pin radius, etc.). The daily alert job sends matches to Telegram as a **photo + caption** (property image + key fields + link), falling back to plain text when an image isn't available.
+The UI has an **Alerts** tab where you define criteria (max price, min bedrooms, council tax bands, property types, pin radius, etc.). The daily alert job — which fires after the 09:00–09:59 scrape chain completes — sends matches to Telegram as a **photo + caption** (property image + key fields + link), falling back to plain text when an image isn't available.
 
 ## Telegram Bot Commands
 
@@ -100,15 +104,15 @@ Most users configure the app via the UI wizard. These env vars mainly pre-seed t
 |---|---|---|
 | `CITY` | `Manchester` | Pre-fills the wizard's city field |
 | `LISTING_TYPE` | `rent` | `rent` or `buy` |
-| `PAGES` | `1` | Max pages to scrape per source |
-| `SOURCE` | `rightmove` | `rightmove`, `zoopla`, or `both` |
+| `PAGES` | `5` | Max pages to scrape per source |
+| `SOURCE` | `rightmove` | `rightmove`, `zoopla`, `openrent`, a comma-separated list, or `all` |
 | `TELEGRAM_BOT_TOKEN` | | Can be set via the wizard instead |
 | `TELEGRAM_CHAT_ID` | | Can be set via the wizard instead |
 
 ```bash
 # Example: pre-seed defaults for the wizard
 docker run -p 8080:8080 \
-  -e CITY="London" -e LISTING_TYPE="rent" -e SOURCE="both" -e PAGES=10 \
+  -e CITY="London" -e LISTING_TYPE="rent" -e SOURCE="all" -e PAGES=10 \
   -v property-data:/app/data \
   property-viewer
 ```
@@ -123,8 +127,11 @@ playwright install chromium
 # Scrape a single source
 python src/scrape_listings.py --city Manchester --type rent --source rightmove --pages 5
 
-# Scrape both sources concurrently (with cross-site dedup)
-python src/scrape_listings.py --city Manchester --type rent --source both --pages 5
+# Scrape a custom subset (comma-separated, concurrent, with cross-site dedup)
+python src/scrape_listings.py --city Manchester --type rent --source rightmove,openrent --pages 5
+
+# Scrape every supported source concurrently (default)
+python src/scrape_listings.py --city Manchester --type rent --source all --pages 5
 
 # Fetch amenities (bars/cafes/shops always included; --amenities adds "closest X" lookups)
 python src/fetch_amenities.py manchester_rent_listings.json --amenities climbing,cinema,gym,parks

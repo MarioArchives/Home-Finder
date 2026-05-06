@@ -25,13 +25,10 @@ def main():
     directory = sys.argv[2] if len(sys.argv) > 2 else "."
     cfg.ui_dir = Path(os.path.abspath(directory))
 
-    # Import after cfg.ui_dir is set so the app picks up the right path.
     import uvicorn
     from server_lib.app import app
 
     print(f"Serving on http://0.0.0.0:{port} (ui_dir: {cfg.ui_dir})", flush=True)
-    # access_log=False keeps the noisy per-request logging suppressed, matching
-    # the behaviour of the old AppHandler.log_message override.
     uvicorn.run(app, host="0.0.0.0", port=port, access_log=False)
 
 
