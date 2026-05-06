@@ -1,6 +1,32 @@
 # Home Finder
 
 A self-contained property scraper and viewer that overcomes Rightmove/Zoopla's limited filtering. Scrapes listings from Rightmove, OpenRent and/or Zoopla, merges cross-site duplicates, enriches them with nearby amenities from OpenStreetMap, and serves a feature-rich UI with advanced filtering, analytics, mapping, and Telegram alerts.
+### Light and Dark mode support
+
+<table>
+  <tr>
+    <td><img width="1805" height="983" alt="Screenshot From 2026-05-06 15-38-22" src="https://github.com/user-attachments/assets/d8103976-388d-4f03-8b71-c88f8df10a6e" /></td>
+    <td><img width="1805" height="983" alt="Screenshot From 2026-05-06 15-38-09" src="https://github.com/user-attachments/assets/7dae350d-94bc-4547-9cf4-97696049b758" /></td>
+  </tr>
+</table>
+
+### Advanced Search support
+
+<div align="center">
+  <img width="700" alt="Screenshot From 2026-05-06 15-40-23" src="https://github.com/user-attachments/assets/c23be5c4-8204-40ab-8bb4-dffa2e1a9d20" />
+</div>
+
+### Extensive Data Analysis out of the box
+
+<div align="center">
+  <img width="700" alt="image" src="https://github.com/user-attachments/assets/e6a9595b-6eb8-4019-abd2-03712d879ca7" />
+</div>
+
+### Customisable Telegram alerts
+
+<div align="center">
+  <img width="700" alt="image" src="https://github.com/user-attachments/assets/d6c5ba2d-53d1-4474-bc52-2695644c3497" />
+</div>
 
 ## Quick Start (Docker)
 
